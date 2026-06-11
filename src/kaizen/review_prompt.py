@@ -51,13 +51,14 @@ def build_review_prompt(diff: str, intent: str = "") -> str:
         intent_section = f"\n## User Intent\n\n{intent}\n"
 
     return (
-        "You are reviewing a git diff for bugs, security issues, and code quality.\n\n"
+        "You are reviewing a git diff for bugs, security issues, code quality, and documentation accuracy.\n\n"
         "## Instructions\n\n"
         "1. Analyze the diff for correctness, security, and quality\n"
-        "2. For each issue classify severity (info/warning/error) and action:\n"
+        "2. Check whether code changes require documentation updates (README, docstrings, examples, changelog)\n"
+        "3. For each issue classify severity (info/warning/error) and action:\n"
         "   - no-op: informational, no action needed\n"
-        "   - auto-fix: mechanical fix (typos, missing error handling, dead code, obvious bugs, behavioral changes)\n"
-        "3. Provide an overall risk assessment\n\n"
+        "   - auto-fix: mechanical fix (typos, missing error handling, dead code, obvious bugs, behavioral changes, stale docs)\n"
+        "4. Provide an overall risk assessment\n\n"
         "## Output\n\n"
         "Return structured output with:\n"
         "- findings: array of issues found (empty array if clean)\n"
