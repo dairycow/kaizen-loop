@@ -139,6 +139,34 @@ Or set it in config: `"server_url": "http://127.0.0.1:4096"`.
 
 When `--server-url` is set, kaizen skips server startup/teardown — it creates and destroys sessions on the existing server instead.
 
+**Checking for an existing server.** To find any running opencode servers on the machine (the TUI and `opencode serve` both start one):
+
+```bash
+pgrep -a opencode
+```
+
+To check a specific port (e.g. the default `4096`):
+
+```bash
+curl -sf http://127.0.0.1:4096/global/health
+```
+
+A `200` response means a server is running and ready. Note: the TUI starts its own internal server on a random port (unless overridden with `--port`).
+
+**Closing the server.** When you're done, stop the background process:
+
+```bash
+kill %1          # if launched with & in the current shell
+```
+
+Or send `POST /instance/dispose` to shut the server down cleanly over HTTP:
+
+```bash
+curl -X POST http://127.0.0.1:4096/instance/dispose
+```
+
+Note: the TUI runs its own server internally — disposing it will also close the TUI. Only shut down a server you started yourself.
+
 ## Project structure
 
 ```
