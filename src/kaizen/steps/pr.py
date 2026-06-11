@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import subprocess
 
-from kaizen.agent import OpenCodeAgent
 from kaizen.findings import FindingsResult
 from kaizen.steps import StepOutcome
 

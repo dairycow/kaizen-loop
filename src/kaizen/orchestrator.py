@@ -5,7 +5,6 @@ from kaizen.config import load_config
 from kaizen.git import (
     branch_commit_count,
     commit_all,
-    head_commit,
     push_branch,
     reset_hard,
 )

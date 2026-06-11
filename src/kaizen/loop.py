@@ -45,8 +45,6 @@ def _setup_work_context(
     cwd: str,
     use_worktree: bool = True,
 ) -> _WorkContext:
-    config = load_config()
-
     kaizen_dir = os.path.join(cwd, ".kaizen")
     os.makedirs(kaizen_dir, exist_ok=True)
     gitignore = os.path.join(kaizen_dir, ".gitignore")
@@ -124,7 +122,7 @@ def run_loop(
     try:
         # ── Phase 1: WORK ──
         print(f"\n{'=' * 50}")
-        print(f"  PHASE: WORK")
+        print("  PHASE: WORK")
         print(f"{'=' * 50}")
 
         config = load_config()
@@ -143,7 +141,7 @@ def run_loop(
 
         # ── Phase 2: REVIEW (with fix loop) ──
         print(f"\n{'=' * 50}")
-        print(f"  PHASE: REVIEW")
+        print("  PHASE: REVIEW")
         print(f"{'=' * 50}")
 
         review_step = ReviewStep()
@@ -194,7 +192,7 @@ def run_loop(
 
         # ── Phase 3: SHIP ──
         print(f"\n{'=' * 50}")
-        print(f"  PHASE: SHIP")
+        print("  PHASE: SHIP")
         print(f"{'=' * 50}")
 
         push_step = PushStep()
@@ -225,7 +223,7 @@ def run_loop(
 
     finally:
         # ── Phase 4: CLEANUP ──
-        print(f"\n  cleaning up...")
+        print("\n  cleaning up...")
         if ctx.worktree_path:
             remove_worktree(cwd, ctx.worktree_path)
         else:

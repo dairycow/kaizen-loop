@@ -24,5 +24,6 @@ jobs:
       - uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv pip install -e ".[dev]" --system
-      - run: python -m pytest
+      - run: uv venv
+      - run: uv pip install -e ".[dev]"
+      - run: uv run python -m pytest

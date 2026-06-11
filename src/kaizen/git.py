@@ -132,7 +132,7 @@ def branch_diff_stats(base: str, cwd: str) -> dict:
     rng = f"{base}..HEAD"
     name_status = _git(["diff", "--name-status", rng], cwd)
     numstat = _git(["diff", "--numstat", rng], cwd)
-    files_changed = len([l for l in name_status.splitlines() if l.strip()])
+    files_changed = len([line for line in name_status.splitlines() if line.strip()])
     lines_added = 0
     lines_deleted = 0
     for line in numstat.splitlines():

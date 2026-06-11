@@ -1,4 +1,3 @@
-import json
 import os
 import uuid
 from dataclasses import dataclass
@@ -88,7 +87,7 @@ def append_notes(
         lines.append("")
     if learnings:
         lines.append("**Learnings:**")
-        lines.extend(f"- {l}" for l in learnings)
+        lines.extend(f"- {item}" for item in learnings)
         lines.append("")
     with open(notes_path, "a") as f:
         f.write("\n".join(lines))

@@ -54,12 +54,12 @@ def cmd_loop(args: argparse.Namespace) -> None:
         )
 
         if result == "passed":
-            print(f"\n  kaizen loop passed")
+            print("\n  kaizen loop passed")
         elif result == "cancelled":
-            print(f"\n  kaizen loop cancelled")
+            print("\n  kaizen loop cancelled")
             sys.exit(1)
         else:
-            print(f"\n  kaizen loop failed")
+            print("\n  kaizen loop failed")
             sys.exit(1)
     except Exception as e:
         print(f"\n  fatal: {e}", file=sys.stderr)
