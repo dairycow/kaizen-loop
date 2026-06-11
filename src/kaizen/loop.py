@@ -54,7 +54,7 @@ def _setup_work_context(
     root_gitignore = os.path.join(cwd, ".gitignore")
     if os.path.exists(root_gitignore):
         content = Path(root_gitignore).read_text()
-        if ".kaizen" not in content.splitlines():
+        if not any(".kaizen" in line for line in content.splitlines()):
             Path(root_gitignore).write_text(content.rstrip() + "\n.kaizen/\n")
     else:
         Path(root_gitignore).write_text(".kaizen/\n")
