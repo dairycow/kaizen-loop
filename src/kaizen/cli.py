@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import sys
 
@@ -84,7 +85,7 @@ def main() -> None:
     parser.add_argument("--server-url", help="URL of an existing opencode serve instance (e.g. http://127.0.0.1:4096)")
 
     args = parser.parse_args()
-    args.cwd = args.directory or ""
+    args.cwd = args.directory or os.getcwd()
 
     if args.prompt:
         cmd_loop(args)
