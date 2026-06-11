@@ -19,14 +19,15 @@ class AgentResult:
 
 
 class OpenCodeAgent:
-    def __init__(self, bin_path: str = "opencode"):
+    def __init__(self, bin_path: str = "opencode", server_url: str | None = None):
         self.bin_path = bin_path
+        self._external_server = server_url
         self._process: subprocess.Popen | None = None
-        self._base_url: str | None = None
+        self._base_url: str | None = server_url
         self._port: int | None = None
 
     def _ensure_server(self, server_cwd: str) -> None:
-        if self._process and self._process.poll() is None and self._base_url:
+        if self._base_url:
             return
 
         self._port = _get_free_port()
@@ -156,6 +157,8 @@ class OpenCodeAgent:
             pass
 
     def close(self) -> None:
+        if self._external_server:
+            return
         if self._process and self._process.poll() is None:
             try:
                 os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)

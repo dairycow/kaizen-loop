@@ -26,7 +26,7 @@ That's it. kaizen creates an isolated branch, the agent does the work, the pipel
 ### Options
 
 ```
-kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] [--no-worktree]
+kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] [--no-worktree] [--server-url URL]
 ```
 
 | Option | Meaning |
@@ -36,6 +36,7 @@ kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] 
 | `--max-review-rounds` | Max review rounds |
 | `--no-worktree` | Work in current tree instead of a worktree |
 | `--opencode-bin` | Path to opencode binary |
+| `--server-url` | Reuse an existing `opencode serve` instance (e.g. `http://127.0.0.1:4096`) |
 
 ## How it works
 
@@ -119,9 +120,24 @@ The work phase uses a `notes.md` file to carry context across iterations. Each i
   "max_review_rounds": 3,
   "max_consecutive_failures": 3,
   "opencode_bin": "opencode",
-  "use_worktree": true
+  "use_worktree": true,
+  "server_url": null
 }
 ```
+
+### Shared server
+
+By default each kaizen run spawns its own `opencode serve` process. For batch work, start a server once and reuse it across runs:
+
+```bash
+opencode serve --hostname 127.0.0.1 --port 4096 &
+kaizen "fix issue #1" --server-url http://127.0.0.1:4096
+kaizen "fix issue #2" --server-url http://127.0.0.1:4096
+```
+
+Or set it in config: `"server_url": "http://127.0.0.1:4096"`.
+
+When `--server-url` is set, kaizen skips server startup/teardown — it creates and destroys sessions on the existing server instead.
 
 ## Project structure
 

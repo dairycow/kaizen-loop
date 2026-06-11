@@ -23,8 +23,9 @@ def cmd_loop(args: argparse.Namespace) -> None:
     config = load_config()
     opencode_bin = args.opencode_bin or config.get("opencode_bin", "opencode")
     use_worktree = not args.no_worktree
+    server_url = args.server_url or config.get("server_url")
 
-    agent = OpenCodeAgent(bin_path=opencode_bin)
+    agent = OpenCodeAgent(bin_path=opencode_bin, server_url=server_url)
 
     force_exit = False
 
@@ -80,6 +81,7 @@ def main() -> None:
     parser.add_argument("--max-review-rounds", type=int, help="Max review rounds")
     parser.add_argument("--no-worktree", action="store_true", help="Work in current tree instead of worktree")
     parser.add_argument("--opencode-bin", help="Path to opencode binary")
+    parser.add_argument("--server-url", help="URL of an existing opencode serve instance (e.g. http://127.0.0.1:4096)")
 
     args = parser.parse_args()
     args.cwd = args.directory or ""

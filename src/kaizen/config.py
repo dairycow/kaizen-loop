@@ -9,6 +9,7 @@ DEFAULT_CONFIG = {
     "max_consecutive_failures": 3,
     "opencode_bin": "opencode",
     "use_worktree": True,
+    "server_url": None,
 }
 
 
