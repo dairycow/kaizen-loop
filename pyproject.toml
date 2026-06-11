@@ -17,3 +17,6 @@ kaizen = "kaizen.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kaizen"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
