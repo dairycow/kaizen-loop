@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Continuous code improvement: autonomous work → review → fix → ship"
 requires-python = ">=3.10"
 license = "MIT"
+dependencies = ["pydantic>=2.0"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]

@@ -23,7 +23,7 @@ from kaizen.git import (
     slugify_prompt,
 )
 from kaizen.orchestrator import Orchestrator
-from kaizen.review_prompt import build_fix_prompt
+from kaizen.review_prompt import FIX_SCHEMA, build_fix_prompt
 from kaizen.run import RunInfo, setup_run, update_run_head, update_run_pr_url, update_run_status
 from kaizen.steps.pr import PRStep
 from kaizen.steps.push import PushStep
@@ -178,7 +178,7 @@ def run_loop(
                 print(f"\n  auto-fixing {len(auto_fix_items)} issues...")
                 fix_prompt = build_fix_prompt([_finding_to_dict(f) for f in auto_fix_items])
                 try:
-                    agent.run(fix_prompt, ctx.work_dir, repo_dir=cwd)
+                    agent.run(fix_prompt, ctx.work_dir, schema=FIX_SCHEMA, repo_dir=cwd)
                     commit_all(f"kaizen: fix {len(auto_fix_items)} review findings", ctx.work_dir)
                     current_head = head_commit(ctx.work_dir)
                     update_run_head(ctx.run_info.run_dir, current_head)

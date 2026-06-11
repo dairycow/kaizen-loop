@@ -1,10 +1,9 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 from kaizen.findings import FindingsResult
 
 
-@dataclass
-class StepOutcome:
+class StepOutcome(BaseModel):
     findings: FindingsResult | None = None
     skipped: bool = False
     skip_remaining: bool = False

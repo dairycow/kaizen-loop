@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
 REVIEW_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -24,6 +28,21 @@ REVIEW_SCHEMA = {
     },
     "required": ["findings", "summary", "risk_level"],
 }
+
+FIX_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "changes_made": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
+    },
+    "required": ["changes_made", "summary"],
+}
+
+
+class FixOutput(BaseModel):
+    changes_made: list[str] = Field(default_factory=list)
+    summary: str = ""
 
 
 def build_review_prompt(diff: str, intent: str = "") -> str:
@@ -62,5 +81,8 @@ def build_fix_prompt(findings_items: list[dict]) -> str:
         lines.append(f"1. [{f['severity']}]{loc} — {f['description']} ({f['action']})")
 
     lines.append("\nAfter fixing, run any available tests or linters to verify.")
+    lines.append("\n## Output\n\nReturn structured output with:")
+    lines.append("- changes_made: array of descriptions of fixes applied")
+    lines.append("- summary: one-sentence summary of fixes")
 
     return "\n".join(lines)

@@ -1,53 +1,44 @@
-from dataclasses import dataclass, field
+from __future__ import annotations
 
-ACTION_NOOP = "no-op"
-ACTION_AUTO_FIX = "auto-fix"
+from functools import cached_property
+from typing import Literal
 
-SEVERITY_INFO = "info"
-SEVERITY_WARNING = "warning"
-SEVERITY_ERROR = "error"
+from pydantic import BaseModel, Field
+
+Action = Literal["no-op", "auto-fix"]
+Severity = Literal["info", "warning", "error"]
+RiskLevel = Literal["low", "medium", "high"]
 
 
-@dataclass
-class Finding:
+class Finding(BaseModel):
     id: str
-    severity: str
+    severity: Severity
     file: str = ""
     line: int = 0
     description: str = ""
-    action: str = ACTION_NOOP
+    action: Action = "no-op"
 
 
-@dataclass
-class FindingsResult:
-    items: list[Finding] = field(default_factory=list)
+class FindingsResult(BaseModel):
+    items: list[Finding] = Field(default_factory=list)
     summary: str = ""
-    risk_level: str = "low"
+    risk_level: RiskLevel = "low"
     risk_rationale: str = ""
 
-    @property
+    @cached_property
     def has_auto_fix(self) -> bool:
-        return any(f.action == ACTION_AUTO_FIX for f in self.items)
+        return any(f.action == "auto-fix" for f in self.items)
 
-    @property
+    @cached_property
     def auto_fix_items(self) -> list[Finding]:
-        return [f for f in self.items if f.action == ACTION_AUTO_FIX]
+        return [f for f in self.items if f.action == "auto-fix"]
 
 
 def parse_findings(data: dict) -> FindingsResult:
-    items = []
-    for i, f in enumerate(data.get("findings", [])):
-        items.append(Finding(
-            id=f.get("id", f"f{i + 1}"),
-            severity=f.get("severity", SEVERITY_INFO),
-            file=f.get("file", ""),
-            line=f.get("line", 0),
-            description=f.get("description", ""),
-            action=f.get("action", ACTION_NOOP),
-        ))
-    return FindingsResult(
-        items=items,
-        summary=data.get("summary", ""),
-        risk_level=data.get("risk_level", "low"),
-        risk_rationale=data.get("risk_rationale", ""),
-    )
+    mapped = {
+        "items": data.get("findings", []),
+        "summary": data.get("summary", ""),
+        "risk_level": data.get("risk_level", "low"),
+        "risk_rationale": data.get("risk_rationale", ""),
+    }
+    return FindingsResult.model_validate(mapped)

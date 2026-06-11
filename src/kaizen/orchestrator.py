@@ -1,5 +1,7 @@
 import time
 
+from pydantic import BaseModel, Field
+
 from kaizen.agent import OpenCodeAgent
 from kaizen.config import load_config
 from kaizen.git import (
@@ -23,6 +25,14 @@ WORK_SCHEMA = {
     },
     "required": ["success", "summary", "key_changes_made", "key_learnings"],
 }
+
+
+class WorkOutput(BaseModel):
+    success: bool
+    summary: str
+    key_changes_made: list[str] = Field(default_factory=list)
+    key_learnings: list[str] = Field(default_factory=list)
+    should_fully_stop: bool = False
 
 
 class Orchestrator:
@@ -93,17 +103,13 @@ class Orchestrator:
                             break
                         continue
 
-                    success = bool(result.output.get("success"))
-                    summary = str(result.output.get("summary", ""))
-                    changes = result.output.get("key_changes_made") or []
-                    learnings = result.output.get("key_learnings") or []
-                    should_stop = bool(result.output.get("should_fully_stop", False))
+                    work = WorkOutput.model_validate(result.output)
 
                     self.total_input_tokens += result.input_tokens
                     self.total_output_tokens += result.output_tokens
 
-                    if success:
-                        commit_msg = f"kaizen {self.iteration}: {summary}"
+                    if work.success:
+                        commit_msg = f"kaizen {self.iteration}: {work.summary}"
                         try:
                             commit_all(commit_msg, self.cwd)
                         except RuntimeError as e:
@@ -117,9 +123,9 @@ class Orchestrator:
                         self.consecutive_failures = 0
                         append_notes(
                             self.run_info.run_dir + "/notes.md",
-                            self.iteration, summary, changes, learnings,
+                            self.iteration, work.summary, work.key_changes_made, work.key_learnings,
                         )
-                        print(f"  committed: {summary}")
+                        print(f"  committed: {work.summary}")
 
                         if self.push_remote:
                             try:
@@ -133,11 +139,11 @@ class Orchestrator:
                         reset_hard(self.cwd)
                         append_notes(
                             self.run_info.run_dir + "/notes.md",
-                            self.iteration, f"[FAIL] {summary}", [], learnings,
+                            self.iteration, f"[FAIL] {work.summary}", [], work.key_learnings,
                         )
-                        print(f"  failed: {summary}")
+                        print(f"  failed: {work.summary}")
 
-                    if self.stop_when and should_stop:
+                    if self.stop_when and work.should_fully_stop:
                         print(f"  stop condition met: {self.stop_when}")
                         status = "stopped"
                         break
