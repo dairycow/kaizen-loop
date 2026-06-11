@@ -9,6 +9,9 @@ description = "Continuous code improvement: autonomous work → review → fix �
 requires-python = ">=3.10"
 license = "MIT"
 
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
 [project.scripts]
 kaizen = "kaizen.cli:main"
 
