@@ -2,7 +2,7 @@
 
 Continuous code improvement: autonomous work → review → fix → ship.
 
-A zero-dependency Python harness that drives [opencode](https://opencode.ai) through the full cycle of writing, validating, and shipping code — with as little human-in-the-loop as possible.
+A zero-dependency Python harness that drives [opencode](https://opencode.ai) through the full cycle of writing, validating, and shipping code — fully autonomous.
 
 ## Quick start
 
@@ -58,16 +58,14 @@ kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] 
                 └───────────────┬───────────────┘
                                 │
                    ┌────────────────────────────┐
-                   │  REVIEW                     │
-                   │  agent reviews diff          │
-                   │  returns structured findings │
-                   │  ┌────────────────────────┐ │
-                   │  │  auto-fix findings?     │ │
-                   │  │  → agent fixes, re-review│ │
-                   │  │  ask-user findings?     │ │
-                   │  │  → escalate to human    │ │
-                   │  └────────────────────────┘ │
-                   └────────────┬───────────────┘
+                    │  REVIEW                     │
+                    │  agent reviews diff          │
+                    │  returns structured findings │
+                    │  ┌────────────────────────┐ │
+                    │  │  auto-fix findings?     │ │
+                    │  │  → agent fixes, re-review│ │
+                    │  └────────────────────────┘ │
+                    └────────────┬───────────────┘
                                 │
                       ┌──────────────────┐
                       │  SHIP            │
@@ -90,10 +88,7 @@ The review step returns structured findings with actions:
 | Action | Meaning | Who handles it |
 |---|---|---|
 | `no-op` | Informational | Silently accepted |
-| `auto-fix` | Mechanical fix (typos, dead code, missing error handling) | Agent fixes automatically |
-| `ask-user` | Changes product behavior or challenges deliberate intent | Escalated to you |
-
-You only interact when `ask-user` findings appear. Everything else is automated.
+| `auto-fix` | Mechanical fix (typos, dead code, missing error handling, behavioral changes) | Agent fixes automatically |
 
 ### Worktree isolation
 

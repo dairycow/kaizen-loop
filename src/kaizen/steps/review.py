@@ -51,7 +51,5 @@ class ReviewStep:
         print()
 
         return StepOutcome(
-            needs_approval=True,
-            auto_fixable=findings.has_auto_fix,
             findings=findings,
         )

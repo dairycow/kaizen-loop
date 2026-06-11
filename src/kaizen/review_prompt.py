@@ -13,7 +13,7 @@ REVIEW_SCHEMA = {
                     "file": {"type": "string"},
                     "line": {"type": "integer"},
                     "description": {"type": "string"},
-                    "action": {"type": "string", "enum": ["no-op", "auto-fix", "ask-user"]},
+                    "action": {"type": "string", "enum": ["no-op", "auto-fix"]},
                 },
                 "required": ["id", "severity", "description", "action"],
             },
@@ -37,8 +37,7 @@ def build_review_prompt(diff: str, intent: str = "") -> str:
         "1. Analyze the diff for correctness, security, and quality\n"
         "2. For each issue classify severity (info/warning/error) and action:\n"
         "   - no-op: informational, no action needed\n"
-        "   - auto-fix: mechanical fix (typos, missing error handling, dead code, obvious bugs)\n"
-        "   - ask-user: changes product behavior or challenges deliberate intent\n"
+        "   - auto-fix: mechanical fix (typos, missing error handling, dead code, obvious bugs, behavioral changes)\n"
         "3. Provide an overall risk assessment\n\n"
         "## Output\n\n"
         "Return structured output with:\n"
@@ -52,20 +51,15 @@ def build_review_prompt(diff: str, intent: str = "") -> str:
     )
 
 
-def build_fix_prompt(findings_items: list[dict], user_instructions: str = "") -> str:
+def build_fix_prompt(findings_items: list[dict]) -> str:
     lines = [
         "Fix the following issues found during code review.\n",
         "Do NOT commit. Just make the code changes.\n",
     ]
 
     for f in findings_items:
-        loc = f" ({f['file']}:{f['line']})" if f.get("file") else ""
+        loc = f" ({f['file']}:{f.get('line', '?')})" if f.get("file") else ""
         lines.append(f"1. [{f['severity']}]{loc} — {f['description']} ({f['action']})")
-        if f.get("user_instructions"):
-            lines.append(f"   User instructions: {f['user_instructions']}")
-
-    if user_instructions:
-        lines.append(f"\nAdditional instructions: {user_instructions}")
 
     lines.append("\nAfter fixing, run any available tests or linters to verify.")
 

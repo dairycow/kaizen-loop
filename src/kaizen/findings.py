@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 
 ACTION_NOOP = "no-op"
 ACTION_AUTO_FIX = "auto-fix"
-ACTION_ASK_USER = "ask-user"
 
 SEVERITY_INFO = "info"
 SEVERITY_WARNING = "warning"
@@ -27,20 +26,12 @@ class FindingsResult:
     risk_rationale: str = ""
 
     @property
-    def needs_approval(self) -> bool:
-        return any(f.action == ACTION_ASK_USER for f in self.items)
-
-    @property
     def has_auto_fix(self) -> bool:
         return any(f.action == ACTION_AUTO_FIX for f in self.items)
 
     @property
     def auto_fix_items(self) -> list[Finding]:
         return [f for f in self.items if f.action == ACTION_AUTO_FIX]
-
-    @property
-    def ask_user_items(self) -> list[Finding]:
-        return [f for f in self.items if f.action == ACTION_ASK_USER]
 
 
 def parse_findings(data: dict) -> FindingsResult:

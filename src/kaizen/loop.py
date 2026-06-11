@@ -7,7 +7,7 @@ from pathlib import Path
 
 from kaizen.agent import OpenCodeAgent
 from kaizen.config import load_config
-from kaizen.findings import ACTION_ASK_USER, ACTION_AUTO_FIX, FindingsResult, Finding
+from kaizen.findings import FindingsResult, Finding
 from kaizen.git import (
     checkout,
     commit_all,
@@ -169,13 +169,12 @@ def run_loop(
             if outcome.findings:
                 final_findings = outcome.findings
 
-            if not outcome.needs_approval or not outcome.findings or not outcome.findings.items:
+            if not outcome.findings or not outcome.findings.items:
                 print("  review clean")
                 break
 
             findings = outcome.findings
             auto_fix_items = findings.auto_fix_items
-            ask_user_items = findings.ask_user_items
 
             if auto_fix_items:
                 print(f"\n  auto-fixing {len(auto_fix_items)} issues...")
@@ -189,33 +188,9 @@ def run_loop(
                     continue
                 except Exception as e:
                     print(f"  auto-fix failed: {e}")
-
-            if ask_user_items:
-                _present_findings(findings)
-                action = _get_user_action(findings)
-                if action == "approve":
-                    break
-                elif action == "fix":
-                    instructions = _get_user_instructions()
-                    fix_prompt = build_fix_prompt(
-                        [_finding_to_dict(f) for f in ask_user_items],
-                        user_instructions=instructions,
-                    )
-                    try:
-                        agent.run(fix_prompt, ctx.work_dir, repo_dir=cwd)
-                        commit_all("kaizen: fix user-flagged findings", ctx.work_dir)
-                        current_head = head_commit(ctx.work_dir)
-                        update_run_head(ctx.run_info.run_dir, current_head)
-                    except Exception as e:
-                        print(f"  fix failed: {e}")
-                    continue
-                elif action == "abort":
-                    update_run_status(ctx.run_info.run_dir, "cancelled")
-                    return "cancelled"
-                else:
-                    break
             else:
-                break
+                print("  no actionable findings")
+            break
 
         # ── Phase 3: SHIP ──
         print(f"\n{'=' * 50}")
@@ -273,39 +248,3 @@ def _finding_to_dict(f: Finding) -> dict:
     if f.line:
         d["line"] = f.line
     return d
-
-
-def _present_findings(findings: FindingsResult) -> None:
-    print(f"\n  Risk: {findings.risk_level} — {findings.risk_rationale}")
-    print(f"  {findings.summary}\n")
-    if findings.items:
-        print(f"  {'ID':<6} {'SEV':<9} {'ACTION':<12} DESCRIPTION")
-        print(f"  {'-' * 6} {'-' * 9} {'-' * 12} {'-' * 40}")
-        for f in findings.items:
-            desc = f.description[:60]
-            print(f"  {f.id:<6} {f.severity:<9} {f.action:<12} {desc}")
-    print()
-
-
-def _get_user_action(findings: FindingsResult) -> str:
-    while True:
-        print("  [a]pprove  [f]ix  [A]bort")
-        try:
-            choice = input("  > ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            return "abort"
-        if choice in ("a", "approve"):
-            return "approve"
-        elif choice in ("f", "fix"):
-            return "fix"
-        elif choice == "abort":
-            return "abort"
-
-
-def _get_user_instructions() -> str:
-    print("  Enter fix instructions (empty for none):")
-    try:
-        return input("  > ").strip()
-    except (EOFError, KeyboardInterrupt):
-        return ""
