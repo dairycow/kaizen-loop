@@ -28,6 +28,7 @@ class OpenCodeAgent:
 
     def _ensure_server(self, server_cwd: str) -> None:
         if self._base_url:
+            self._check_external_server()
             return
 
         self._port = _get_free_port()
@@ -51,6 +52,25 @@ class OpenCodeAgent:
         )
         self._base_url = f"http://127.0.0.1:{self._port}"
         self._wait_healthy(timeout=30)
+
+    def _check_external_server(self) -> None:
+        url = self._base_url
+        if not url:
+            raise RuntimeError("No server URL configured")
+        try:
+            req = Request(f"{url}/global/health")
+            with urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    return
+        except (URLError, OSError) as e:
+            port = url.split(":")[-1].rstrip("/")
+            raise RuntimeError(
+                f"Shared server at {url} is not reachable. "
+                f"Start it with: opencode serve --hostname 127.0.0.1 --port {port}  |  Error: {e}"
+            )
+        raise RuntimeError(
+            f"Shared server at {url} returned status {resp.status}"
+        )
 
     def _wait_healthy(self, timeout: float = 30) -> None:
         deadline = time.monotonic() + timeout
@@ -159,19 +179,27 @@ class OpenCodeAgent:
     def close(self) -> None:
         if self._external_server:
             return
-        if self._process and self._process.poll() is None:
+        if self._base_url:
             try:
-                os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
-            except OSError:
-                self._process.terminate()
+                self._request("/instance/dispose", method="POST", timeout=5)
+            except Exception:
+                pass
+        if self._process and self._process.poll() is None:
             try:
                 self._process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 try:
-                    os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
+                    os.killpg(os.getpgid(self._process.pid), signal.SIGTERM)
                 except OSError:
-                    self._process.kill()
-                self._process.wait(timeout=2)
+                    self._process.terminate()
+                try:
+                    self._process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
+                    except OSError:
+                        self._process.kill()
+                    self._process.wait(timeout=2)
         self._process = None
         self._base_url = None
         self._port = None
