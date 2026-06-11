@@ -1,9 +1,0 @@
-{
-  "$schema": "https://opencode.ai/config.json",
-  "command": {
-    "release": {
-      "template": "Cut a new release of this package.\n\nSteps:\n1. Read the current version from pyproject.toml and src/kaizen/__init__.py — they must match\n2. Determine the next version bump (patch, minor, or major) based on the changes since the last tag. Use `git log LAST_TAG..HEAD --oneline` to review changes\n3. Update the version in both pyproject.toml and src/kaizen/__init__.py\n4. Commit with message `release: vX.Y.Z`\n5. Create an annotated git tag `vX.Y.Z`\n6. Push the commit and tag to origin\n7. Monitor the GitHub Actions release workflow until it completes (success or failure)\n8. If successful, reinstall locally with `uv tool install kaizen-loop --reinstall --force` and verify with `kaizen --version`\n9. If failed, diagnose the failure from the workflow logs and report back\n\nDo NOT skip any of these steps. Always verify both version files are in sync before committing.",
-      "description": "Bump version, tag, push, and publish a new release via CI"
-    }
-  }
-}
