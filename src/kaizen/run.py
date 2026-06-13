@@ -18,20 +18,16 @@ class RunInfo:
     status: str = "pending"
 
 
-def runs_home() -> str:
-    return os.path.expanduser("~/.kaizen/runs")
-
-
 def setup_run(
     prompt: str,
     branch: str,
     base_commit: str,
     head_commit: str,
+    run_dir: str,
     run_id: str,
     worktree_path: str | None = None,
     repo_cwd: str | None = None,
 ) -> RunInfo:
-    run_dir = os.path.join(runs_home(), run_id)
     os.makedirs(run_dir, exist_ok=True)
 
     info = RunInfo(

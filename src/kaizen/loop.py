@@ -33,7 +33,6 @@ from kaizen.review_prompt import FIX_SCHEMA, build_fix_prompt
 from kaizen.run import (
     RunInfo,
     load_run,
-    runs_home,
     setup_run,
     update_run_head,
     update_run_pr_url,
@@ -76,7 +75,7 @@ def _setup_work_context(
     hash_id = hash_prompt(repo_path, prompt)
     branch = prompt_branch(repo_path, prompt)
     worktree_path = os.path.join(cwd, ".kaizen", "worktrees", hash_id)
-    run_dir = os.path.join(runs_home(), hash_id)
+    run_dir = os.path.join(cwd, ".kaizen", "runs", hash_id)
 
     if use_worktree and os.path.isdir(worktree_path) and is_git_repo(worktree_path):
         run_info = load_run(run_dir)
@@ -137,6 +136,7 @@ def _setup_work_context(
         branch=branch,
         base_commit=base_commit,
         head_commit=current_head,
+        run_dir=run_dir,
         run_id=hash_id,
         worktree_path=wt_path,
         repo_cwd=cwd,

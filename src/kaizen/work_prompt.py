@@ -1,6 +1,11 @@
+import os
+
+from kaizen.run import RunInfo
+
+
 def build_iteration_prompt(
     n: int,
-    run_id: str,
+    run_info: RunInfo,
     prompt: str,
     stop_when: str | None = None,
 ) -> str:
@@ -25,12 +30,13 @@ def build_iteration_prompt(
         )
 
     fields_text = "\n".join(output_fields)
+    notes_path = os.path.join(run_info.run_dir, "notes.md")
 
     return (
         "You are working autonomously towards an objective.\n"
         f"This is iteration {n}. Each iteration makes one incremental step.\n\n"
         "## Instructions\n\n"
-        f"1. Read .kaizen/runs/{run_id}/notes.md to understand prior work. Do NOT modify notes.md\n"
+        f"1. Read {notes_path} to understand prior work. Do NOT modify notes.md\n"
         "2. Identify the next smallest verifiable unit of work\n"
         "3. If a solution didn't move the needle, document learnings and set success=false\n"
         "4. If you made code changes, run build/tests/linters if available. Do NOT make git commits\n"

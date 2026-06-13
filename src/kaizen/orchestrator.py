@@ -85,7 +85,7 @@ class Orchestrator:
 
                     iter_prompt = build_iteration_prompt(
                         self.iteration,
-                        self.run_info.run_id,
+                        self.run_info,
                         self.prompt,
                         self.stop_when,
                     )

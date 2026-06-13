@@ -34,7 +34,7 @@ echo "PID: $!"
 Then immediately report to the user that kaizen has been started, and show them how to check on it:
 
 ```bash
-RUN_ID=$(ls -t ~/.kaizen/runs/ | head -1) && python3 -c "import json; print(json.load(open('$HOME/.kaizen/runs/$RUN_ID/run.json'))['status'])"
+RUN_ID=$(ls -t .kaizen/runs/ | head -1) && python3 -c "import json; print(json.load(open('.kaizen/runs/$RUN_ID/run.json'))['status'])"
 ```
 
 ```bash
@@ -137,7 +137,7 @@ curl -X POST http://127.0.0.1:4096/instance/dispose
 
 ## Run history
 
-All runs are stored in `~/.kaizen/runs/<run-id>/`. Each run directory contains:
+All runs are stored in `<repo>/.kaizen/runs/<run-id>/`. Each run directory contains:
 
 | File | Content |
 |---|---|
@@ -147,13 +147,13 @@ All runs are stored in `~/.kaizen/runs/<run-id>/`. Each run directory contains:
 To inspect recent runs:
 
 ```bash
-ls -lt ~/.kaizen/runs/ | head
+ls -lt .kaizen/runs/ | head
 ```
 
 To check a specific run's status:
 
 ```bash
-python3 -c "import json; print(json.load(open('$HOME/.kaizen/runs/<run-id>/run.json'))['status'])"
+python3 -c "import json; print(json.load(open('.kaizen/runs/<run-id>/run.json'))['status'])"
 ```
 
 ## Pipeline details
@@ -247,5 +247,5 @@ echo "PID: $!"
 
 ```bash
 tail -20 /tmp/kaizen-latest.log
-RUN_ID=$(ls -t ~/.kaizen/runs/ | head -1) && python3 -c "import json; r=json.load(open('$HOME/.kaizen/runs/$RUN_ID/run.json')); print(f'status={r[\"status\"]} branch={r[\"branch\"]}')"
+RUN_ID=$(ls -t .kaizen/runs/ | head -1) && python3 -c "import json; r=json.load(open('.kaizen/runs/$RUN_ID/run.json')); print(f'status={r[\"status\"]} branch={r[\"branch\"]}')"
 ```
