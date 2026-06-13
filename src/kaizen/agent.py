@@ -13,18 +13,6 @@ _MAX_RETRIES = 2
 _RETRY_BASE_DELAY = 0.5
 
 
-def _validate_server_url(url: str | None) -> None:
-    if url is None:
-        return
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(
-            f"Invalid server URL: {url!r}. Must start with http:// or https://"
-        )
-    if not parsed.hostname:
-        raise ValueError(f"Invalid server URL: {url!r}. No hostname found.")
-
-
 def _discover_server(project_dir: str) -> str | None:
     try:
         result = subprocess.run(
@@ -101,12 +89,8 @@ class OpenCodeAgent:
     def __init__(
         self,
         project_dir: str,
-        server_url: str | None = None,
-        bin_path: str = "opencode",
     ):
-        _validate_server_url(server_url)
-        self.bin_path = bin_path
-        self._base_url: str | None = server_url
+        self._base_url: str | None = None
         self._project_dir = project_dir
         self._conn: http.client.HTTPConnection | None = None
 
@@ -121,8 +105,7 @@ class OpenCodeAgent:
 
         raise RuntimeError(
             "No opencode server found.\n"
-            "Start one with: opencode serve --hostname 127.0.0.1 --port 4096\n"
-            "Or use --server-url to specify an existing server."
+            "Start one with: opencode serve --hostname 127.0.0.1 --port 4096"
         )
 
     def _get_conn(self) -> http.client.HTTPConnection:

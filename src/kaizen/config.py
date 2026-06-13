@@ -7,9 +7,7 @@ DEFAULT_CONFIG = {
     "max_work_iterations": None,
     "max_review_rounds": 3,
     "max_consecutive_failures": 3,
-    "opencode_bin": "opencode",
     "use_worktree": True,
-    "server_url": None,
 }
 
 

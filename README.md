@@ -30,7 +30,7 @@ kaizen auto-discovers a running `opencode serve` process on your machine (prefer
 ### Options
 
 ```
-kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] [--no-worktree] [--server-url URL]
+kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] [--no-worktree]
 ```
 
 | Option | Meaning |
@@ -39,8 +39,6 @@ kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] 
 | `--max-iterations` | Max work iterations |
 | `--max-review-rounds` | Max review rounds |
 | `--no-worktree` | Work in current tree instead of a worktree |
-| `--opencode-bin` | Path to opencode binary |
-| `--server-url` | Explicit server URL (skips auto-discovery) |
 
 ## How it works
 
@@ -121,7 +119,7 @@ opencode serve --hostname 127.0.0.1 --port 4096 &
 
 ### Auto-discovery
 
-When `--server-url` is not set, kaizen auto-discovers a running `opencode serve` process by:
+kaizen auto-discovers a running `opencode serve` process by:
 
 1. Finding processes matching `opencode serve` via `pgrep`
 2. Parsing the `--port` from each process's command line
@@ -134,7 +132,6 @@ If no server is found:
 ```
 Error: No opencode server found.
 Start one with: opencode serve --hostname 127.0.0.1 --port 4096
-Or use --server-url to specify an existing server.
 ```
 
 ### Batch work
@@ -145,13 +142,6 @@ For batch work, start one server and reuse it across runs:
 opencode serve --hostname 127.0.0.1 --port 4096 &
 kaizen "fix issue #1"
 kaizen "fix issue #2"
-```
-
-Or explicitly with `--server-url`:
-
-```bash
-kaizen "fix issue #1" --server-url http://127.0.0.1:4096
-kaizen "fix issue #2" --server-url http://127.0.0.1:4096
 ```
 
 ### Checking server status
@@ -177,18 +167,16 @@ kill %1    # if launched with & in the current shell
   "max_work_iterations": null,
   "max_review_rounds": 3,
   "max_consecutive_failures": 3,
-  "opencode_bin": "opencode",
-  "use_worktree": true,
-  "server_url": null
+  "use_worktree": true
 }
 ```
-
-Set `server_url` to always use a specific server without relying on auto-discovery.
 
 ## Project structure
 
 ```
 src/kaizen/
+  __init__.py         # package init
+  __main__.py         # `python -m kaizen` support
   agent.py            # opencode HTTP client + auto-discovery
   git.py              # git operations
   config.py           # ~/.kaizen/config.json

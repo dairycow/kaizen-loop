@@ -22,14 +22,10 @@ def cmd_loop(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     config = load_config()
-    opencode_bin = args.opencode_bin or config.get("opencode_bin", "opencode")
     use_worktree = not args.no_worktree
-    server_url = args.server_url or config.get("server_url")
 
     agent = OpenCodeAgent(
         project_dir=cwd,
-        server_url=server_url,
-        bin_path=opencode_bin,
     )
 
     signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0))
@@ -79,11 +75,6 @@ def main() -> None:
         "--no-worktree",
         action="store_true",
         help="Work in current tree instead of worktree",
-    )
-    parser.add_argument("--opencode-bin", help="Path to opencode binary")
-    parser.add_argument(
-        "--server-url",
-        help="Explicit opencode server URL (skips auto-discovery, e.g. http://127.0.0.1:4096)",
     )
 
     args = parser.parse_args()
