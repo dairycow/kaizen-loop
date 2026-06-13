@@ -29,21 +29,8 @@ def git_root(cwd: str) -> str:
     return _git(["rev-parse", "--show-toplevel"], cwd)
 
 
-def current_branch(cwd: str) -> str:
-    try:
-        return _git(["symbolic-ref", "--short", "HEAD"], cwd)
-    except RuntimeError:
-        return _git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
-
-
 def head_commit(cwd: str) -> str:
     return _git(["rev-parse", "HEAD"], cwd)
-
-
-def ensure_clean_tree(cwd: str) -> None:
-    status = _git(["status", "--porcelain"], cwd)
-    if status:
-        raise RuntimeError("Working tree is not clean. Commit or stash changes first.")
 
 
 def get_default_branch(cwd: str) -> str:
@@ -134,52 +121,12 @@ def branch_commit_count(base: str, cwd: str) -> int:
     return int(_git(["rev-list", "--count", "--first-parent", f"{base}..HEAD"], cwd))
 
 
-def branch_diff_stats(base: str, cwd: str) -> dict:
-    if not base:
-        return {"files_changed": 0, "lines_added": 0, "lines_deleted": 0}
-    rng = f"{base}..HEAD"
-    name_status = _git(["diff", "--name-status", rng], cwd)
-    numstat = _git(["diff", "--numstat", rng], cwd)
-    files_changed = len([line for line in name_status.splitlines() if line.strip()])
-    lines_added = 0
-    lines_deleted = 0
-    for line in numstat.splitlines():
-        parts = line.split("\t")
-        if len(parts) >= 2 and parts[0] != "-":
-            lines_added += int(parts[0] or 0)
-            lines_deleted += int(parts[1] or 0)
-    return {
-        "files_changed": files_changed,
-        "lines_added": lines_added,
-        "lines_deleted": lines_deleted,
-    }
-
-
 def hash_prompt(repo_path: str, prompt: str) -> str:
     return hashlib.sha256(f"{repo_path}\n{prompt}".encode()).hexdigest()[:12]
 
 
 def prompt_branch(repo_path: str, prompt: str) -> str:
     return f"kaizen/{hash_prompt(repo_path, prompt)}"
-
-
-def create_worktree(repo_cwd: str, branch_name: str, target_path: str) -> str:
-    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-    if os.path.isdir(target_path):
-        remove_worktree(repo_cwd, target_path)
-    try:
-        _git(["worktree", "add", target_path, "-b", branch_name, "HEAD"], repo_cwd)
-    except RuntimeError as e:
-        if "already exists" not in str(e).lower():
-            raise
-        remove_worktree(repo_cwd, target_path)
-        try:
-            _git(["branch", "-D", branch_name], repo_cwd)
-        except RuntimeError:
-            pass
-        _git(["worktree", "prune"], repo_cwd)
-        _git(["worktree", "add", target_path, "-b", branch_name, "HEAD"], repo_cwd)
-    return target_path
 
 
 def create_worktree_from_ref(

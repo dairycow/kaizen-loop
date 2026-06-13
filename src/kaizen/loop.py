@@ -39,9 +39,7 @@ from kaizen.run import (
     update_run_pr_url,
     update_run_status,
 )
-from kaizen.steps.pr import PRStep
-from kaizen.steps.push import PushStep
-from kaizen.steps.review import ReviewStep
+from kaizen.steps import create_pr, push, review
 
 
 @dataclass
@@ -182,6 +180,7 @@ def run_loop(
             cwd=ctx.work_dir,
             max_iterations=max_work_iterations or config.get("max_work_iterations"),
             start_iteration=ctx.start_iteration,
+            config=config,
             repo_dir=cwd,
         )
         orch.run()
@@ -193,14 +192,13 @@ def run_loop(
         print("  PHASE: REVIEW")
         print(f"{'=' * 50}")
 
-        review_step = ReviewStep()
         final_findings: FindingsResult | None = None
 
         for round_num in range(max_review_rounds):
             print(f"\n  review round {round_num + 1}/{max_review_rounds}")
 
             current_head = head_commit(ctx.work_dir)
-            outcome = review_step.execute(
+            rvw = review(
                 work_dir=ctx.work_dir,
                 base_commit=ctx.base_commit,
                 head_commit=current_head,
@@ -209,18 +207,18 @@ def run_loop(
                 repo_dir=cwd,
             )
 
-            if outcome.skipped:
+            if rvw.skipped:
                 print("  review skipped")
                 break
 
-            if outcome.findings:
-                final_findings = outcome.findings
+            if rvw.findings:
+                final_findings = rvw.findings
 
-            if not outcome.findings or not outcome.findings.items:
+            if not rvw.findings or not rvw.findings.items:
                 print("  review clean")
                 break
 
-            findings = outcome.findings
+            findings = rvw.findings
             auto_fix_items = findings.auto_fix_items
 
             if auto_fix_items:
@@ -248,15 +246,13 @@ def run_loop(
         print("  PHASE: SHIP")
         print(f"{'=' * 50}")
 
-        push_step = PushStep()
-        push_outcome = push_step.execute(work_dir=ctx.work_dir, branch=ctx.branch)
+        push_outcome = push(work_dir=ctx.work_dir, branch=ctx.branch)
         if push_outcome.skipped:
             print("  push skipped, cannot create PR")
             update_run_status(ctx.run_info.run_dir, "failed")
             return "failed"
 
-        pr_step = PRStep()
-        pr_outcome = pr_step.execute(
+        pr_outcome = create_pr(
             work_dir=ctx.work_dir,
             branch=ctx.branch,
             base_branch=ctx.default_branch,
@@ -277,7 +273,20 @@ def run_loop(
 
     finally:
         print("\n  cleaning up...")
-        if result == "passed":
+        preserve = False
+        if result != "passed":
+            try:
+                if branch_commit_count(ctx.base_commit, ctx.work_dir) > 0:
+                    preserve = True
+            except Exception:
+                pass
+
+        if preserve:
+            print("  preserving worktree for resume")
+            notes_path = os.path.join(ctx.run_info.run_dir, "notes.md")
+            with open(notes_path, "a") as f:
+                f.write("\nRun interrupted - worktree preserved for resume\n")
+        else:
             if ctx.worktree_path:
                 remove_worktree(cwd, ctx.worktree_path)
             else:
@@ -286,27 +295,6 @@ def run_loop(
                 except RuntimeError:
                     pass
             delete_branch(ctx.branch, cwd)
-        else:
-            preserve = False
-            try:
-                if branch_commit_count(ctx.base_commit, ctx.work_dir) > 0:
-                    preserve = True
-            except Exception:
-                pass
-            if preserve:
-                print("  preserving worktree for resume")
-                notes_path = os.path.join(ctx.run_info.run_dir, "notes.md")
-                with open(notes_path, "a") as f:
-                    f.write("\nRun interrupted - worktree preserved for resume\n")
-            else:
-                if ctx.worktree_path:
-                    remove_worktree(cwd, ctx.worktree_path)
-                else:
-                    try:
-                        checkout(ctx.default_branch, cwd)
-                    except RuntimeError:
-                        pass
-                delete_branch(ctx.branch, cwd)
 
 
 def _finding_to_dict(f: Finding) -> dict:

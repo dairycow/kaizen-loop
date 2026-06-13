@@ -1,33 +1,25 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Literal
-
-from pydantic import BaseModel, Field
-
-Action = Literal["no-op", "auto-fix"]
-Severity = Literal["info", "warning", "error"]
-RiskLevel = Literal["low", "medium", "high"]
 
 
-class Finding(BaseModel):
+@dataclass
+class Finding:
     id: str
-    severity: Severity
+    severity: str
     file: str = ""
     line: int = 0
     description: str = ""
-    action: Action = "no-op"
+    action: str = "no-op"
 
 
-class FindingsResult(BaseModel):
-    items: list[Finding] = Field(default_factory=list)
+@dataclass
+class FindingsResult:
+    items: list[Finding] = field(default_factory=list)
     summary: str = ""
-    risk_level: RiskLevel = "low"
+    risk_level: str = "low"
     risk_rationale: str = ""
-
-    @cached_property
-    def has_auto_fix(self) -> bool:
-        return any(f.action == "auto-fix" for f in self.items)
 
     @cached_property
     def auto_fix_items(self) -> list[Finding]:
@@ -35,10 +27,19 @@ class FindingsResult(BaseModel):
 
 
 def parse_findings(data: dict) -> FindingsResult:
-    mapped = {
-        "items": data.get("findings", []),
-        "summary": data.get("summary", ""),
-        "risk_level": data.get("risk_level", "low"),
-        "risk_rationale": data.get("risk_rationale", ""),
-    }
-    return FindingsResult.model_validate(mapped)
+    items = []
+    for raw in data.get("findings", []):
+        items.append(Finding(
+            id=raw.get("id", ""),
+            severity=raw.get("severity", "info"),
+            file=raw.get("file", ""),
+            line=raw.get("line", 0),
+            description=raw.get("description", ""),
+            action=raw.get("action", "no-op"),
+        ))
+    return FindingsResult(
+        items=items,
+        summary=data.get("summary", ""),
+        risk_level=data.get("risk_level", "low"),
+        risk_rationale=data.get("risk_rationale", ""),
+    )

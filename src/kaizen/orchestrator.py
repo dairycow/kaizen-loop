@@ -1,14 +1,12 @@
 import random
 import time
 
-from pydantic import BaseModel, Field
+from dataclasses import dataclass, field
 
 from kaizen.agent import OpenCodeAgent
-from kaizen.config import load_config
 from kaizen.git import (
     branch_commit_count,
     commit_all,
-    push_branch,
     reset_hard,
 )
 from kaizen.run import RunInfo, append_notes
@@ -31,11 +29,12 @@ WORK_SCHEMA = {
 }
 
 
-class WorkOutput(BaseModel):
+@dataclass
+class WorkOutput:
     success: bool
     summary: str
-    key_changes_made: list[str] = Field(default_factory=list)
-    key_learnings: list[str] = Field(default_factory=list)
+    key_changes_made: list[str] = field(default_factory=list)
+    key_learnings: list[str] = field(default_factory=list)
     should_fully_stop: bool = False
 
 
@@ -49,7 +48,7 @@ class Orchestrator:
         start_iteration: int = 0,
         max_iterations: int | None = None,
         stop_when: str | None = None,
-        push_remote: str | None = None,
+        config: dict | None = None,
         repo_dir: str | None = None,
     ):
         self.agent = agent
@@ -57,11 +56,10 @@ class Orchestrator:
         self.prompt = prompt
         self.cwd = cwd
         self.repo_dir = repo_dir
-        self.config = load_config()
+        self.config = config or {}
         self.iteration = start_iteration
         self.max_iterations = max_iterations
         self.stop_when = stop_when
-        self.push_remote = push_remote
         self.success_count = 0
         self.fail_count = 0
         self.consecutive_failures = 0
@@ -69,18 +67,14 @@ class Orchestrator:
         self.total_output_tokens = 0
         self.commit_count = branch_commit_count(run_info.base_commit, cwd)
         self.start_time: float = 0
-        self._stop_requested = False
-
-    def request_stop(self) -> None:
-        self._stop_requested = True
 
     def run(self) -> str:
         self.start_time = time.time()
         status = "stopped"
 
         try:
-            with self.agent.session(self.cwd, repo_dir=self.repo_dir) as sess:
-                while not self._stop_requested:
+            with self.agent.session(self.cwd, repo_dir=self.repo_dir) as sess_id:
+                while True:
                     if self.max_iterations and self.iteration >= self.max_iterations:
                         print(f"  max iterations reached ({self.max_iterations})")
                         status = "aborted"
@@ -97,7 +91,7 @@ class Orchestrator:
                     )
 
                     try:
-                        result = sess.send(iter_prompt, schema=WORK_SCHEMA)
+                        result = self.agent.send(sess_id, iter_prompt, schema=WORK_SCHEMA)
                     except Exception as e:
                         print(f"  [ERROR] {e}")
                         self.fail_count += 1
@@ -121,11 +115,11 @@ class Orchestrator:
                             f"  backing off {delay:.0f}s (failure {self.consecutive_failures})..."
                         )
                         deadline = time.time() + delay
-                        while time.time() < deadline and not self._stop_requested:
+                        while time.time() < deadline:
                             time.sleep(min(0.5, max(0, deadline - time.time())))
                         continue
 
-                    work = WorkOutput.model_validate(result.output)
+                    work = WorkOutput(**result.output)
 
                     self.total_input_tokens += result.input_tokens
                     self.total_output_tokens += result.output_tokens
@@ -153,13 +147,6 @@ class Orchestrator:
                             work.key_learnings,
                         )
                         print(f"  committed: {work.summary}")
-
-                        if self.push_remote:
-                            try:
-                                push_branch(self.cwd, self.push_remote)
-                                print(f"  pushed to {self.push_remote}")
-                            except RuntimeError as e:
-                                print(f"  [PUSH FAILED] {e}")
                     else:
                         self.fail_count += 1
                         self.consecutive_failures += 1
@@ -192,8 +179,3 @@ class Orchestrator:
             status = "stopped"
 
         return status
-
-    def elapsed(self) -> float:
-        if not self.start_time:
-            return 0
-        return time.time() - self.start_time

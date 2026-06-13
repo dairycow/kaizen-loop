@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
 REVIEW_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -41,11 +39,6 @@ FIX_SCHEMA = {
     },
     "required": ["changes_made", "summary"],
 }
-
-
-class FixOutput(BaseModel):
-    changes_made: list[str] = Field(default_factory=list)
-    summary: str = ""
 
 
 def build_review_prompt(diff: str, intent: str = "") -> str:

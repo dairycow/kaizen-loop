@@ -34,23 +34,6 @@ class AgentResult:
     output_tokens: int = 0
 
 
-class _Session:
-    def __init__(self, agent: "OpenCodeAgent", session_id: str):
-        self._agent = agent
-        self._id = session_id
-
-    @property
-    def id(self) -> str:
-        return self._id
-
-    def send(self, prompt: str, schema: dict | None = None) -> AgentResult:
-        try:
-            return self._agent._send_message(self._id, prompt, schema)
-        except Exception:
-            self._agent._abort_session(self._id)
-            raise
-
-
 class OpenCodeAgent:
     def __init__(self, bin_path: str = "opencode", server_url: str | None = None):
         _validate_server_url(server_url)
@@ -87,7 +70,7 @@ class OpenCodeAgent:
                 pass
             self._conn = None
 
-    def _http_request(
+    def _request(
         self,
         method: str,
         path: str,
@@ -135,15 +118,6 @@ class OpenCodeAgent:
                 ) from e
         raise last_err  # type: ignore[misc]
 
-    def _request(
-        self,
-        path: str,
-        method: str = "GET",
-        body: dict | None = None,
-        timeout: float = 300,
-    ) -> dict:
-        return self._http_request(method, path, body=body, timeout=timeout)
-
     def _ensure_server(self, server_cwd: str) -> None:
         if self._base_url:
             self._check_external_server()
@@ -179,7 +153,7 @@ class OpenCodeAgent:
         if not url:
             raise RuntimeError("No server URL configured")
         try:
-            self._http_request("GET", "/global/health", timeout=5, max_retries=1)
+            self._request("GET", "/global/health", timeout=5, max_retries=1)
         except (
             RuntimeError,
             ConnectionError,
@@ -214,8 +188,8 @@ class OpenCodeAgent:
 
     def _create_session(self, session_dir: str) -> str:
         resp = self._request(
+            "POST",
             f"/session?directory={quote(session_dir, safe='')}",
-            method="POST",
             body={},
             timeout=10,
         )
@@ -227,9 +201,16 @@ class OpenCodeAgent:
         self._ensure_server(server_cwd)
         session_id = self._create_session(work_dir)
         try:
-            yield _Session(self, session_id)
+            yield session_id
         finally:
             self._delete_session(session_id)
+
+    def send(self, session_id: str, prompt: str, schema: dict | None = None) -> AgentResult:
+        try:
+            return self._send_message(session_id, prompt, schema)
+        except Exception:
+            self._abort_session(session_id)
+            raise
 
     def run(
         self,
@@ -263,8 +244,8 @@ class OpenCodeAgent:
                 "retryCount": 1,
             }
         result = self._request(
+            "POST",
             f"/session/{session_id}/message",
-            method="POST",
             body=body,
             timeout=600,
         )
@@ -292,13 +273,13 @@ class OpenCodeAgent:
 
     def _abort_session(self, session_id: str) -> None:
         try:
-            self._request(f"/session/{session_id}/abort", method="POST", timeout=3)
+            self._request("POST", f"/session/{session_id}/abort", timeout=3)
         except Exception:
             pass
 
     def _delete_session(self, session_id: str) -> None:
         try:
-            self._request(f"/session/{session_id}", method="DELETE", timeout=3)
+            self._request("DELETE", f"/session/{session_id}", timeout=3)
         except Exception:
             pass
 
@@ -308,7 +289,7 @@ class OpenCodeAgent:
             return
         if self._base_url:
             try:
-                self._http_request(
+                self._request(
                     "POST", "/instance/dispose", timeout=5, max_retries=0
                 )
             except Exception:

@@ -1,5 +1,6 @@
+import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 
 
@@ -14,6 +15,7 @@ class RunInfo:
     worktree_path: str | None = None
     repo_cwd: str | None = None
     pr_url: str | None = None
+    status: str = "pending"
 
 
 def runs_home() -> str:
@@ -32,16 +34,17 @@ def setup_run(
     run_dir = os.path.join(runs_home(), run_id)
     os.makedirs(run_dir, exist_ok=True)
 
-    Path(os.path.join(run_dir, "prompt.md")).write_text(prompt + "\n")
-    Path(os.path.join(run_dir, "branch")).write_text(branch + "\n")
-    Path(os.path.join(run_dir, "base-commit")).write_text(base_commit + "\n")
-    Path(os.path.join(run_dir, "head-commit")).write_text(head_commit + "\n")
-    Path(os.path.join(run_dir, "status")).write_text("pending\n")
-
-    if worktree_path:
-        Path(os.path.join(run_dir, "worktree")).write_text(worktree_path + "\n")
-    if repo_cwd:
-        Path(os.path.join(run_dir, "repo-cwd")).write_text(repo_cwd + "\n")
+    info = RunInfo(
+        run_id=run_id,
+        run_dir=run_dir,
+        prompt=prompt,
+        branch=branch,
+        base_commit=base_commit,
+        head_commit=head_commit,
+        worktree_path=worktree_path,
+        repo_cwd=repo_cwd,
+    )
+    _save(info)
 
     notes_path = os.path.join(run_dir, "notes.md")
     if not os.path.exists(notes_path):
@@ -49,64 +52,46 @@ def setup_run(
             f"# kaizen run: {run_id}\n\nObjective: {prompt}\n\n## Iteration Log\n"
         )
 
-    return RunInfo(
-        run_id=run_id,
-        run_dir=run_dir,
-        prompt=prompt,
-        branch=branch,
-        base_commit=base_commit,
-        head_commit=head_commit,
-        worktree_path=worktree_path,
-        repo_cwd=repo_cwd,
-    )
-
-
-def update_run_status(run_dir: str, status: str) -> None:
-    Path(os.path.join(run_dir, "status")).write_text(status + "\n")
-
-
-def update_run_head(run_dir: str, head: str) -> None:
-    Path(os.path.join(run_dir, "head-commit")).write_text(head + "\n")
-
-
-def update_run_pr_url(run_dir: str, pr_url: str) -> None:
-    Path(os.path.join(run_dir, "pr-url")).write_text(pr_url + "\n")
+    return info
 
 
 def load_run(run_dir: str) -> RunInfo | None:
-    if not os.path.isdir(run_dir):
+    path = os.path.join(run_dir, "run.json")
+    if not os.path.isfile(path):
         return None
     try:
-        prompt = Path(os.path.join(run_dir, "prompt.md")).read_text().strip()
-        branch = Path(os.path.join(run_dir, "branch")).read_text().strip()
-        base_commit = Path(os.path.join(run_dir, "base-commit")).read_text().strip()
-        head_commit = Path(os.path.join(run_dir, "head-commit")).read_text().strip()
-    except FileNotFoundError:
+        data = json.loads(Path(path).read_text())
+        return RunInfo(run_dir=run_dir, **{k: v for k, v in data.items() if k != "run_dir"})
+    except (json.JSONDecodeError, TypeError):
         return None
-    worktree_path = None
-    wt_file = os.path.join(run_dir, "worktree")
-    if os.path.exists(wt_file):
-        worktree_path = Path(wt_file).read_text().strip() or None
-    repo_cwd = None
-    rc_file = os.path.join(run_dir, "repo-cwd")
-    if os.path.exists(rc_file):
-        repo_cwd = Path(rc_file).read_text().strip() or None
-    run_id = os.path.basename(run_dir)
-    pr_url = None
-    pr_file = os.path.join(run_dir, "pr-url")
-    if os.path.exists(pr_file):
-        pr_url = Path(pr_file).read_text().strip() or None
-    return RunInfo(
-        run_id=run_id,
-        run_dir=run_dir,
-        prompt=prompt,
-        branch=branch,
-        base_commit=base_commit,
-        head_commit=head_commit,
-        worktree_path=worktree_path,
-        repo_cwd=repo_cwd,
-        pr_url=pr_url,
-    )
+
+
+def update_run_status(run_dir: str, status: str) -> None:
+    info = load_run(run_dir)
+    if info:
+        info.status = status
+        _save(info)
+
+
+def update_run_head(run_dir: str, head: str) -> None:
+    info = load_run(run_dir)
+    if info:
+        info.head_commit = head
+        _save(info)
+
+
+def update_run_pr_url(run_dir: str, pr_url: str) -> None:
+    info = load_run(run_dir)
+    if info:
+        info.pr_url = pr_url
+        _save(info)
+
+
+def _save(info: RunInfo) -> None:
+    path = os.path.join(info.run_dir, "run.json")
+    d = asdict(info)
+    del d["run_dir"]
+    Path(path).write_text(json.dumps(d, indent=2) + "\n")
 
 
 def append_notes(
