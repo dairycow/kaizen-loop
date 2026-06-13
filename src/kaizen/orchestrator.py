@@ -73,98 +73,34 @@ class Orchestrator:
         status = "stopped"
 
         try:
-            with self.agent.session(self.cwd, repo_dir=self.repo_dir) as sess_id:
-                while True:
-                    if self.max_iterations and self.iteration >= self.max_iterations:
-                        print(f"  max iterations reached ({self.max_iterations})")
-                        status = "aborted"
-                        break
+            while True:
+                if self.max_iterations and self.iteration >= self.max_iterations:
+                    print(f"  max iterations reached ({self.max_iterations})")
+                    status = "aborted"
+                    break
 
-                    self.iteration += 1
-                    print(f"\n  --- work iteration {self.iteration} ---")
+                self.iteration += 1
+                print(f"\n  --- work iteration {self.iteration} ---")
 
-                    iter_prompt = build_iteration_prompt(
-                        self.iteration,
-                        self.run_info,
-                        self.prompt,
-                        self.stop_when,
-                    )
+                iter_prompt = build_iteration_prompt(
+                    self.iteration,
+                    self.run_info,
+                    self.prompt,
+                    self.stop_when,
+                )
 
-                    try:
-                        result = self.agent.send(sess_id, iter_prompt, schema=WORK_SCHEMA)
-                    except Exception as e:
-                        print(f"  [ERROR] {e}")
-                        self.fail_count += 1
-                        self.consecutive_failures += 1
-                        reset_hard(self.cwd)
-                        if self.consecutive_failures >= self.config.get(
-                            "max_consecutive_failures", 3
-                        ):
-                            print(
-                                f"  {self.consecutive_failures} consecutive failures, aborting"
-                            )
-                            status = "aborted"
-                            break
-                        delay = min(
-                            _BACKOFF_BASE_DELAY
-                            * (2 ** (self.consecutive_failures - 1)),
-                            _BACKOFF_MAX_DELAY,
+                try:
+                    with self.agent.session(
+                        self.cwd, repo_dir=self.repo_dir
+                    ) as sess_id:
+                        result = self.agent.send(
+                            sess_id, iter_prompt, schema=WORK_SCHEMA
                         )
-                        delay *= 0.5 + random.random() * 0.5
-                        print(
-                            f"  backing off {delay:.0f}s (failure {self.consecutive_failures})..."
-                        )
-                        deadline = time.time() + delay
-                        while time.time() < deadline:
-                            time.sleep(min(0.5, max(0, deadline - time.time())))
-                        continue
-
-                    work = WorkOutput(**result.output)
-
-                    self.total_input_tokens += result.input_tokens
-                    self.total_output_tokens += result.output_tokens
-
-                    if work.success:
-                        commit_msg = f"kaizen {self.iteration}: {work.summary}"
-                        try:
-                            commit_all(commit_msg, self.cwd)
-                        except RuntimeError as e:
-                            print(f"  [COMMIT FAILED] {e}")
-                            self.fail_count += 1
-                            self.consecutive_failures += 1
-                            continue
-
-                        self.commit_count = branch_commit_count(
-                            self.run_info.base_commit, self.cwd
-                        )
-                        self.success_count += 1
-                        self.consecutive_failures = 0
-                        append_notes(
-                            self.run_info.run_dir + "/notes.md",
-                            self.iteration,
-                            work.summary,
-                            work.key_changes_made,
-                            work.key_learnings,
-                        )
-                        print(f"  committed: {work.summary}")
-                    else:
-                        self.fail_count += 1
-                        self.consecutive_failures += 1
-                        reset_hard(self.cwd)
-                        append_notes(
-                            self.run_info.run_dir + "/notes.md",
-                            self.iteration,
-                            f"[FAIL] {work.summary}",
-                            [],
-                            work.key_learnings,
-                        )
-                        print(f"  failed: {work.summary}")
-
-                    if self.stop_when and work.should_fully_stop:
-                        print(f"  stop condition met: {self.stop_when}")
-                        status = "stopped"
-                        break
-
+                except Exception as e:
+                    print(f"  [ERROR] {e}")
+                    self.fail_count += 1
+                    self.consecutive_failures += 1
+                    reset_hard(self.cwd)
                     if self.consecutive_failures >= self.config.get(
                         "max_consecutive_failures", 3
                     ):
@@ -173,6 +109,73 @@ class Orchestrator:
                         )
                         status = "aborted"
                         break
+                    delay = min(
+                        _BACKOFF_BASE_DELAY * (2 ** (self.consecutive_failures - 1)),
+                        _BACKOFF_MAX_DELAY,
+                    )
+                    delay *= 0.5 + random.random() * 0.5
+                    print(
+                        f"  backing off {delay:.0f}s (failure {self.consecutive_failures})..."
+                    )
+                    deadline = time.time() + delay
+                    while time.time() < deadline:
+                        time.sleep(min(0.5, max(0, deadline - time.time())))
+                    continue
+
+                work = WorkOutput(**result.output)
+
+                self.total_input_tokens += result.input_tokens
+                self.total_output_tokens += result.output_tokens
+
+                if work.success:
+                    commit_msg = f"kaizen {self.iteration}: {work.summary}"
+                    try:
+                        commit_all(commit_msg, self.cwd)
+                    except RuntimeError as e:
+                        print(f"  [COMMIT FAILED] {e}")
+                        self.fail_count += 1
+                        self.consecutive_failures += 1
+                        continue
+
+                    self.commit_count = branch_commit_count(
+                        self.run_info.base_commit, self.cwd
+                    )
+                    self.success_count += 1
+                    self.consecutive_failures = 0
+                    append_notes(
+                        self.run_info.run_dir + "/notes.md",
+                        self.iteration,
+                        work.summary,
+                        work.key_changes_made,
+                        work.key_learnings,
+                    )
+                    print(f"  committed: {work.summary}")
+                else:
+                    self.fail_count += 1
+                    self.consecutive_failures += 1
+                    reset_hard(self.cwd)
+                    append_notes(
+                        self.run_info.run_dir + "/notes.md",
+                        self.iteration,
+                        f"[FAIL] {work.summary}",
+                        [],
+                        work.key_learnings,
+                    )
+                    print(f"  failed: {work.summary}")
+
+                if self.stop_when and work.should_fully_stop:
+                    print(f"  stop condition met: {self.stop_when}")
+                    status = "stopped"
+                    break
+
+                if self.consecutive_failures >= self.config.get(
+                    "max_consecutive_failures", 3
+                ):
+                    print(
+                        f"  {self.consecutive_failures} consecutive failures, aborting"
+                    )
+                    status = "aborted"
+                    break
 
         except KeyboardInterrupt:
             print("\n  interrupted")

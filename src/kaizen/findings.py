@@ -29,14 +29,16 @@ class FindingsResult:
 def parse_findings(data: dict) -> FindingsResult:
     items = []
     for raw in data.get("findings", []):
-        items.append(Finding(
-            id=raw.get("id", ""),
-            severity=raw.get("severity", "info"),
-            file=raw.get("file", ""),
-            line=raw.get("line", 0),
-            description=raw.get("description", ""),
-            action=raw.get("action", "no-op"),
-        ))
+        items.append(
+            Finding(
+                id=raw.get("id", ""),
+                severity=raw.get("severity", "info"),
+                file=raw.get("file", ""),
+                line=raw.get("line", 0),
+                description=raw.get("description", ""),
+                action=raw.get("action", "no-op"),
+            )
+        )
     return FindingsResult(
         items=items,
         summary=data.get("summary", ""),

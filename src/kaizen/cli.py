@@ -59,6 +59,9 @@ def cmd_loop(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+
     parser = argparse.ArgumentParser(
         prog="kaizen",
         description="Continuous code improvement: work → review → fix → ship",

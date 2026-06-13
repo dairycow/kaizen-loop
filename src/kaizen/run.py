@@ -57,7 +57,9 @@ def load_run(run_dir: str) -> RunInfo | None:
         return None
     try:
         data = json.loads(Path(path).read_text())
-        return RunInfo(run_dir=run_dir, **{k: v for k, v in data.items() if k != "run_dir"})
+        return RunInfo(
+            run_dir=run_dir, **{k: v for k, v in data.items() if k != "run_dir"}
+        )
     except (json.JSONDecodeError, TypeError):
         return None
 

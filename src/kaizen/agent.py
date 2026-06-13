@@ -8,9 +8,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from urllib.parse import quote, urlparse
 
-_RETRYABLE_STATUS = frozenset({502, 503, 504})
-_MAX_RETRIES = 2
+_RETRYABLE_STATUS = frozenset({500, 502, 503, 504})
+_MAX_RETRIES = 4
 _RETRY_BASE_DELAY = 0.5
+_SESSION_GRACE_SECONDS = 1.0
 
 
 def _discover_server(project_dir: str) -> str | None:
@@ -55,7 +56,7 @@ def _discover_server(project_dir: str) -> str | None:
 
         candidates.append((url, cwd_match))
 
-    candidates.sort(key=lambda c: (0 if c[1] else 1))
+    candidates.sort(key=lambda c: 0 if c[1] else 1)
 
     for url, _ in candidates:
         try:
@@ -92,7 +93,6 @@ class OpenCodeAgent:
     ):
         self._base_url: str | None = None
         self._project_dir = project_dir
-        self._conn: http.client.HTTPConnection | None = None
 
     def _resolve_server(self) -> None:
         if self._base_url:
@@ -108,31 +108,18 @@ class OpenCodeAgent:
             "Start one with: opencode serve --hostname 127.0.0.1 --port 4096"
         )
 
-    def _get_conn(self) -> http.client.HTTPConnection:
-        if self._conn is not None:
-            return self._conn
+    def _new_connection(
+        self, timeout: float | None = None
+    ) -> http.client.HTTPConnection:
         url = self._base_url
         if not url:
             raise RuntimeError("No server URL configured")
         parsed = urlparse(url)
-        self._conn = http.client.HTTPConnection(
+        return http.client.HTTPConnection(
             parsed.hostname or "127.0.0.1",
             parsed.port or 80,
-            timeout=300,
+            timeout=timeout or 300,
         )
-        return self._conn
-
-    def _reconnect(self) -> http.client.HTTPConnection:
-        self._close_conn()
-        return self._get_conn()
-
-    def _close_conn(self) -> None:
-        if self._conn:
-            try:
-                self._conn.close()
-            except Exception:
-                pass
-            self._conn = None
 
     def _request(
         self,
@@ -142,9 +129,6 @@ class OpenCodeAgent:
         timeout: float | None = None,
         max_retries: int = _MAX_RETRIES,
     ) -> dict:
-        conn = self._get_conn()
-        if timeout is not None:
-            conn.timeout = timeout
         headers = {"Accept": "application/json"}
         data = None
         if body is not None:
@@ -153,6 +137,7 @@ class OpenCodeAgent:
 
         last_err: Exception | None = None
         for attempt in range(max_retries + 1):
+            conn = self._new_connection(timeout)
             try:
                 conn.request(method, path, body=data, headers=headers)
                 resp = conn.getresponse()
@@ -162,7 +147,6 @@ class OpenCodeAgent:
                 if resp.status in _RETRYABLE_STATUS and attempt < max_retries:
                     last_err = RuntimeError(f"HTTP {resp.status}")
                     time.sleep(_RETRY_BASE_DELAY * (2**attempt))
-                    conn = self._reconnect()
                     continue
                 raise RuntimeError(
                     f"HTTP {resp.status}: {resp_data.decode(errors='replace')}"
@@ -175,11 +159,12 @@ class OpenCodeAgent:
                 if attempt < max_retries:
                     last_err = e
                     time.sleep(_RETRY_BASE_DELAY * (2**attempt))
-                    conn = self._reconnect()
                     continue
                 raise RuntimeError(
                     f"Request failed after {max_retries} retries: {e}"
                 ) from e
+            finally:
+                conn.close()
         raise last_err  # type: ignore[misc]
 
     def _create_session(self, session_dir: str) -> str:
@@ -198,14 +183,13 @@ class OpenCodeAgent:
         try:
             yield session_id
         finally:
+            time.sleep(_SESSION_GRACE_SECONDS)
             self._delete_session(session_id)
 
-    def send(self, session_id: str, prompt: str, schema: dict | None = None) -> AgentResult:
-        try:
-            return self._send_message(session_id, prompt, schema)
-        except Exception:
-            self._abort_session(session_id)
-            raise
+    def send(
+        self, session_id: str, prompt: str, schema: dict | None = None
+    ) -> AgentResult:
+        return self._send_message(session_id, prompt, schema)
 
     def run(
         self,
@@ -218,10 +202,8 @@ class OpenCodeAgent:
         session_id = self._create_session(work_dir)
         try:
             return self._send_message(session_id, prompt, schema)
-        except Exception:
-            self._abort_session(session_id)
-            raise
         finally:
+            time.sleep(_SESSION_GRACE_SECONDS)
             self._delete_session(session_id)
 
     def _send_message(
@@ -265,12 +247,6 @@ class OpenCodeAgent:
 
         raise RuntimeError(f"Agent returned unstructured text: {text[:200]}")
 
-    def _abort_session(self, session_id: str) -> None:
-        try:
-            self._request("POST", f"/session/{session_id}/abort", timeout=3)
-        except Exception:
-            pass
-
     def _delete_session(self, session_id: str) -> None:
         try:
             self._request("DELETE", f"/session/{session_id}", timeout=3)
@@ -278,4 +254,4 @@ class OpenCodeAgent:
             pass
 
     def close(self) -> None:
-        self._close_conn()
+        pass
