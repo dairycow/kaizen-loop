@@ -8,6 +8,8 @@ DEFAULT_CONFIG = {
     "max_review_rounds": 3,
     "max_consecutive_failures": 3,
     "use_worktree": True,
+    "work_model": None,
+    "review_model": None,
 }
 
 

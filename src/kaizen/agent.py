@@ -14,6 +14,18 @@ _RETRY_BASE_DELAY = 0.5
 _SESSION_GRACE_SECONDS = 1.0
 
 
+def _parse_model(model_str: str | None) -> dict | None:
+    if not model_str:
+        return None
+    if "/" not in model_str:
+        raise ValueError(
+            f"Model must be 'providerID/modelID' "
+            f"(e.g. 'zai-coding-plan/glm-5-turbo'), got: {model_str}"
+        )
+    provider_id, model_id = model_str.split("/", 1)
+    return {"providerID": provider_id, "modelID": model_id}
+
+
 def _discover_server(project_dir: str) -> str | None:
     try:
         result = subprocess.run(
@@ -187,9 +199,13 @@ class OpenCodeAgent:
             self._delete_session(session_id)
 
     def send(
-        self, session_id: str, prompt: str, schema: dict | None = None
+        self,
+        session_id: str,
+        prompt: str,
+        schema: dict | None = None,
+        model: str | None = None,
     ) -> AgentResult:
-        return self._send_message(session_id, prompt, schema)
+        return self._send_message(session_id, prompt, schema, model)
 
     def run(
         self,
@@ -197,17 +213,22 @@ class OpenCodeAgent:
         work_dir: str,
         schema: dict | None = None,
         repo_dir: str | None = None,
+        model: str | None = None,
     ) -> AgentResult:
         self._resolve_server()
         session_id = self._create_session(work_dir)
         try:
-            return self._send_message(session_id, prompt, schema)
+            return self._send_message(session_id, prompt, schema, model)
         finally:
             time.sleep(_SESSION_GRACE_SECONDS)
             self._delete_session(session_id)
 
     def _send_message(
-        self, session_id: str, prompt: str, schema: dict | None = None
+        self,
+        session_id: str,
+        prompt: str,
+        schema: dict | None = None,
+        model: str | None = None,
     ) -> AgentResult:
         body: dict = {
             "role": "user",
@@ -219,6 +240,9 @@ class OpenCodeAgent:
                 "schema": schema,
                 "retryCount": 1,
             }
+        parsed_model = _parse_model(model)
+        if parsed_model:
+            body["model"] = parsed_model
         result = self._request(
             "POST",
             f"/session/{session_id}/message",

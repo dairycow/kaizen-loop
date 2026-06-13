@@ -74,6 +74,7 @@ kaizen --version
 
 ```bash
 kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] [--no-worktree]
+               [--model M] [--work-model M] [--review-model M]
 ```
 
 | Option | Meaning |
@@ -82,6 +83,9 @@ kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] 
 | `--max-iterations` | Max work iterations (default: unlimited) |
 | `--max-review-rounds` | Max review rounds (default: 3) |
 | `--no-worktree` | Work in current tree instead of isolated worktree |
+| `--model` | Model for both work and review (`providerID/modelID`) |
+| `--work-model` | Model for work phase only (overrides `--model` and config) |
+| `--review-model` | Model for review phase only (overrides `--model` and config) |
 
 ## Shared server for batch work
 
@@ -131,9 +135,13 @@ curl -X POST http://127.0.0.1:4096/instance/dispose
   "max_work_iterations": null,
   "max_review_rounds": 3,
   "max_consecutive_failures": 3,
-  "use_worktree": true
+  "use_worktree": true,
+  "work_model": null,
+  "review_model": null
 }
 ```
+
+Set `work_model` / `review_model` to a `"providerID/modelID"` string (e.g. `"zai-coding-plan/glm-5-turbo"`) to pin a model per phase. When `null`, the server default is used. CLI flags take precedence over config.
 
 ## Run history
 

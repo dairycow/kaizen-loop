@@ -31,6 +31,7 @@ kaizen auto-discovers a running `opencode serve` process on your machine (prefer
 
 ```
 kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] [--no-worktree]
+               [--model M] [--work-model M] [--review-model M]
 ```
 
 | Option | Meaning |
@@ -39,6 +40,9 @@ kaizen "prompt" [-C /path/to/repo] [--max-iterations N] [--max-review-rounds N] 
 | `--max-iterations` | Max work iterations |
 | `--max-review-rounds` | Max review rounds |
 | `--no-worktree` | Work in current tree instead of a worktree |
+| `--model` | Model for both work and review (`providerID/modelID`) |
+| `--work-model` | Model for work phase only (overrides `--model` and config) |
+| `--review-model` | Model for review phase only (overrides `--model` and config) |
 
 ## How it works
 
@@ -169,9 +173,13 @@ kill %1    # if launched with & in the current shell
   "max_work_iterations": null,
   "max_review_rounds": 3,
   "max_consecutive_failures": 3,
-  "use_worktree": true
+  "use_worktree": true,
+  "work_model": null,
+  "review_model": null
 }
 ```
+
+Set `work_model` / `review_model` to a `"providerID/modelID"` string (e.g. `"zai-coding-plan/glm-5-turbo"`) to pin a model per phase. When `null`, the opencode server's default model is used. CLI flags `--work-model` / `--review-model` override config; `--model` sets both.
 
 ## Project structure
 

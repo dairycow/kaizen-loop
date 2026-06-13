@@ -159,6 +159,8 @@ def run_loop(
     max_work_iterations: int | None = None,
     max_review_rounds: int = 3,
     use_worktree: bool = True,
+    work_model: str | None = None,
+    review_model: str | None = None,
 ) -> str:
     ctx = _setup_work_context(prompt, cwd, use_worktree)
 
@@ -182,6 +184,7 @@ def run_loop(
             start_iteration=ctx.start_iteration,
             config=config,
             repo_dir=cwd,
+            model=work_model,
         )
         orch.run()
 
@@ -205,6 +208,7 @@ def run_loop(
                 agent=agent,
                 intent=prompt,
                 repo_dir=cwd,
+                model=review_model,
             )
 
             if rvw.skipped:
@@ -227,7 +231,13 @@ def run_loop(
                     [_finding_to_dict(f) for f in auto_fix_items]
                 )
                 try:
-                    agent.run(fix_prompt, ctx.work_dir, schema=FIX_SCHEMA, repo_dir=cwd)
+                    agent.run(
+                        fix_prompt,
+                        ctx.work_dir,
+                        schema=FIX_SCHEMA,
+                        repo_dir=cwd,
+                        model=review_model,
+                    )
                     commit_all(
                         f"kaizen: fix {len(auto_fix_items)} review findings",
                         ctx.work_dir,

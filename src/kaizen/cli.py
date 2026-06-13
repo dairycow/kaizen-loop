@@ -24,6 +24,12 @@ def cmd_loop(args: argparse.Namespace) -> None:
     config = load_config()
     use_worktree = not args.no_worktree
 
+    work_model = args.work_model or args.model or config.get("work_model")
+    review_model = args.review_model or args.model or config.get("review_model")
+
+    print(f"  work model:   {work_model or 'server default'}")
+    print(f"  review model: {review_model or 'server default'}")
+
     agent = OpenCodeAgent(
         project_dir=cwd,
     )
@@ -41,6 +47,8 @@ def cmd_loop(args: argparse.Namespace) -> None:
             max_review_rounds=args.max_review_rounds
             or config.get("max_review_rounds", 3),
             use_worktree=use_worktree,
+            work_model=work_model,
+            review_model=review_model,
         )
 
         if result == "passed":
@@ -78,6 +86,18 @@ def main() -> None:
         "--no-worktree",
         action="store_true",
         help="Work in current tree instead of worktree",
+    )
+    parser.add_argument(
+        "--model",
+        help="Model for both work and review (providerID/modelID, e.g. zai-coding-plan/glm-5-turbo)",
+    )
+    parser.add_argument(
+        "--work-model",
+        help="Model for work phase only (overrides --model and config)",
+    )
+    parser.add_argument(
+        "--review-model",
+        help="Model for review phase only (overrides --model and config)",
     )
 
     args = parser.parse_args()

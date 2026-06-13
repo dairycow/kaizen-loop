@@ -50,12 +50,14 @@ class Orchestrator:
         stop_when: str | None = None,
         config: dict | None = None,
         repo_dir: str | None = None,
+        model: str | None = None,
     ):
         self.agent = agent
         self.run_info = run_info
         self.prompt = prompt
         self.cwd = cwd
         self.repo_dir = repo_dir
+        self.model = model
         self.config = config or {}
         self.iteration = start_iteration
         self.max_iterations = max_iterations
@@ -94,7 +96,10 @@ class Orchestrator:
                         self.cwd, repo_dir=self.repo_dir
                     ) as sess_id:
                         result = self.agent.send(
-                            sess_id, iter_prompt, schema=WORK_SCHEMA
+                            sess_id,
+                            iter_prompt,
+                            schema=WORK_SCHEMA,
+                            model=self.model,
                         )
                 except Exception as e:
                     print(f"  [ERROR] {e}")

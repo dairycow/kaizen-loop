@@ -34,6 +34,7 @@ def review(
     agent: OpenCodeAgent,
     intent: str = "",
     repo_dir: str | None = None,
+    model: str | None = None,
 ) -> ReviewResult:
     from kaizen.git import get_diff
 
@@ -52,7 +53,9 @@ def review(
         diff = diff[:max_diff_size] + "\n... (truncated)"
 
     prompt = build_review_prompt(diff, intent=intent)
-    result = agent.run(prompt, work_dir, schema=REVIEW_SCHEMA, repo_dir=repo_dir)
+    result = agent.run(
+        prompt, work_dir, schema=REVIEW_SCHEMA, repo_dir=repo_dir, model=model
+    )
 
     findings = parse_findings(result.output)
 
