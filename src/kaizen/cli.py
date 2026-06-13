@@ -12,7 +12,7 @@ from kaizen.git import is_git_repo
 
 
 def cmd_loop(args: argparse.Namespace) -> None:
-    cwd = args.directory or args.cwd
+    cwd = args.cwd
     if not is_git_repo(cwd):
         print("Error: not a git repo", file=sys.stderr)
         sys.exit(1)
@@ -50,7 +50,8 @@ def cmd_loop(args: argparse.Namespace) -> None:
             cwd=cwd,
             agent=agent,
             max_work_iterations=args.max_iterations,
-            max_review_rounds=args.max_review_rounds or config.get("max_review_rounds", 3),
+            max_review_rounds=args.max_review_rounds
+            or config.get("max_review_rounds", 3),
             use_worktree=use_worktree,
         )
 
@@ -75,14 +76,23 @@ def main() -> None:
         description="Continuous code improvement: work → review → fix → ship",
     )
     parser.add_argument("--version", action="version", version=f"kaizen {__version__}")
-    parser.add_argument("--directory", "-C", help="Path to git repo (default: current dir)")
+    parser.add_argument(
+        "--directory", "-C", help="Path to git repo (default: current dir)"
+    )
 
     parser.add_argument("prompt", nargs="?", help="What the agent should do")
     parser.add_argument("--max-iterations", type=int, help="Max work iterations")
     parser.add_argument("--max-review-rounds", type=int, help="Max review rounds")
-    parser.add_argument("--no-worktree", action="store_true", help="Work in current tree instead of worktree")
+    parser.add_argument(
+        "--no-worktree",
+        action="store_true",
+        help="Work in current tree instead of worktree",
+    )
     parser.add_argument("--opencode-bin", help="Path to opencode binary")
-    parser.add_argument("--server-url", help="URL of an existing opencode serve instance (e.g. http://127.0.0.1:4096)")
+    parser.add_argument(
+        "--server-url",
+        help="URL of an existing opencode serve instance (e.g. http://127.0.0.1:4096)",
+    )
 
     args = parser.parse_args()
     args.cwd = args.directory or os.getcwd()

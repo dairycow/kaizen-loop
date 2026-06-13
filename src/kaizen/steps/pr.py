@@ -12,7 +12,10 @@ class PRStep:
         return "pr"
 
     def execute(
-        self, work_dir: str, branch: str, base_branch: str,
+        self,
+        work_dir: str,
+        branch: str,
+        base_branch: str,
         findings: FindingsResult | None = None,
     ) -> StepOutcome:
         title = f"{branch}: changes"
@@ -53,7 +56,9 @@ class PRStep:
         try:
             result = subprocess.run(
                 ["gh", "pr", "list", "--head", branch, "--json", "url", "--limit", "1"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode == 0 and result.stdout.strip():
                 prs = json.loads(result.stdout)
@@ -64,17 +69,32 @@ class PRStep:
         return ""
 
     def _create_pr(
-        self, branch: str, base_branch: str, title: str, body: str, work_dir: str,
+        self,
+        branch: str,
+        base_branch: str,
+        title: str,
+        body: str,
+        work_dir: str,
     ) -> str:
         try:
             result = subprocess.run(
                 [
-                    "gh", "pr", "create",
-                    "--head", branch, "--base", base_branch,
-                    "--title", title, "--body", body,
+                    "gh",
+                    "pr",
+                    "create",
+                    "--head",
+                    branch,
+                    "--base",
+                    base_branch,
+                    "--title",
+                    title,
+                    "--body",
+                    body,
                 ],
                 cwd=work_dir,
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode == 0:
                 for line in result.stdout.splitlines():
@@ -90,7 +110,9 @@ class PRStep:
         try:
             subprocess.run(
                 ["gh", "pr", "edit", pr_url, "--title", title, "--body", body],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass

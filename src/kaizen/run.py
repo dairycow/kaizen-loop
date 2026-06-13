@@ -1,5 +1,4 @@
 import os
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,10 +25,10 @@ def setup_run(
     branch: str,
     base_commit: str,
     head_commit: str,
+    run_id: str,
     worktree_path: str | None = None,
     repo_cwd: str | None = None,
 ) -> RunInfo:
-    run_id = uuid.uuid4().hex[:8]
     run_dir = os.path.join(runs_home(), run_id)
     os.makedirs(run_dir, exist_ok=True)
 
@@ -47,9 +46,7 @@ def setup_run(
     notes_path = os.path.join(run_dir, "notes.md")
     if not os.path.exists(notes_path):
         Path(notes_path).write_text(
-            f"# kaizen run: {run_id}\n\n"
-            f"Objective: {prompt}\n\n"
-            "## Iteration Log\n"
+            f"# kaizen run: {run_id}\n\nObjective: {prompt}\n\n## Iteration Log\n"
         )
 
     return RunInfo(
@@ -76,9 +73,48 @@ def update_run_pr_url(run_dir: str, pr_url: str) -> None:
     Path(os.path.join(run_dir, "pr-url")).write_text(pr_url + "\n")
 
 
+def load_run(run_dir: str) -> RunInfo | None:
+    if not os.path.isdir(run_dir):
+        return None
+    try:
+        prompt = Path(os.path.join(run_dir, "prompt.md")).read_text().strip()
+        branch = Path(os.path.join(run_dir, "branch")).read_text().strip()
+        base_commit = Path(os.path.join(run_dir, "base-commit")).read_text().strip()
+        head_commit = Path(os.path.join(run_dir, "head-commit")).read_text().strip()
+    except FileNotFoundError:
+        return None
+    worktree_path = None
+    wt_file = os.path.join(run_dir, "worktree")
+    if os.path.exists(wt_file):
+        worktree_path = Path(wt_file).read_text().strip() or None
+    repo_cwd = None
+    rc_file = os.path.join(run_dir, "repo-cwd")
+    if os.path.exists(rc_file):
+        repo_cwd = Path(rc_file).read_text().strip() or None
+    run_id = os.path.basename(run_dir)
+    pr_url = None
+    pr_file = os.path.join(run_dir, "pr-url")
+    if os.path.exists(pr_file):
+        pr_url = Path(pr_file).read_text().strip() or None
+    return RunInfo(
+        run_id=run_id,
+        run_dir=run_dir,
+        prompt=prompt,
+        branch=branch,
+        base_commit=base_commit,
+        head_commit=head_commit,
+        worktree_path=worktree_path,
+        repo_cwd=repo_cwd,
+        pr_url=pr_url,
+    )
+
+
 def append_notes(
-    notes_path: str, iteration: int, summary: str,
-    changes: list[str], learnings: list[str],
+    notes_path: str,
+    iteration: int,
+    summary: str,
+    changes: list[str],
+    learnings: list[str],
 ) -> None:
     lines = [f"\n### Iteration {iteration}\n", f"**Summary:** {summary}\n"]
     if changes:

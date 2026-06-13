@@ -1,5 +1,5 @@
+import hashlib
 import os
-import re
 import subprocess
 
 
@@ -110,7 +110,15 @@ def commit_all(message: str, cwd: str) -> None:
     if diff.returncode == 0:
         return
     _git(
-        ["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m", message],
+        [
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "tag.gpgsign=false",
+            "commit",
+            "-m",
+            message,
+        ],
         cwd,
     )
 
@@ -140,13 +148,19 @@ def branch_diff_stats(base: str, cwd: str) -> dict:
         if len(parts) >= 2 and parts[0] != "-":
             lines_added += int(parts[0] or 0)
             lines_deleted += int(parts[1] or 0)
-    return {"files_changed": files_changed, "lines_added": lines_added, "lines_deleted": lines_deleted}
+    return {
+        "files_changed": files_changed,
+        "lines_added": lines_added,
+        "lines_deleted": lines_deleted,
+    }
 
 
-def slugify_prompt(text: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    slug = re.sub(r"-+", "-", slug)[:50].strip("-")
-    return f"kaizen/{slug}" if slug else "kaizen/run"
+def hash_prompt(repo_path: str, prompt: str) -> str:
+    return hashlib.sha256(f"{repo_path}\n{prompt}".encode()).hexdigest()[:12]
+
+
+def prompt_branch(repo_path: str, prompt: str) -> str:
+    return f"kaizen/{hash_prompt(repo_path, prompt)}"
 
 
 def create_worktree(repo_cwd: str, branch_name: str, target_path: str) -> str:
@@ -168,11 +182,21 @@ def create_worktree(repo_cwd: str, branch_name: str, target_path: str) -> str:
     return target_path
 
 
-def create_worktree_from_ref(repo_cwd: str, target_path: str, branch_name: str, ref: str) -> str:
+def create_worktree_from_ref(
+    repo_cwd: str, target_path: str, branch_name: str, ref: str
+) -> str:
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     if os.path.isdir(target_path):
         remove_worktree(repo_cwd, target_path)
     _git(["worktree", "add", "-b", branch_name, target_path, ref], repo_cwd)
+    return target_path
+
+
+def create_worktree_checkout(repo_cwd: str, target_path: str, branch_name: str) -> str:
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    if os.path.isdir(target_path):
+        remove_worktree(repo_cwd, target_path)
+    _git(["worktree", "add", target_path, branch_name], repo_cwd)
     return target_path
 
 

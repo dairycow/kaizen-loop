@@ -13,7 +13,10 @@ REVIEW_SCHEMA = {
                 "additionalProperties": False,
                 "properties": {
                     "id": {"type": "string"},
-                    "severity": {"type": "string", "enum": ["info", "warning", "error"]},
+                    "severity": {
+                        "type": "string",
+                        "enum": ["info", "warning", "error"],
+                    },
                     "file": {"type": "string"},
                     "line": {"type": "integer"},
                     "description": {"type": "string"},

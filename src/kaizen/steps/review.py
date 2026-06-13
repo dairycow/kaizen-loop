@@ -13,8 +13,13 @@ class ReviewStep:
         return "review"
 
     def execute(
-        self, work_dir: str, base_commit: str, head_commit: str,
-        agent: OpenCodeAgent, intent: str = "", repo_dir: str | None = None,
+        self,
+        work_dir: str,
+        base_commit: str,
+        head_commit: str,
+        agent: OpenCodeAgent,
+        intent: str = "",
+        repo_dir: str | None = None,
     ) -> StepOutcome:
         from kaizen.git import get_diff
 

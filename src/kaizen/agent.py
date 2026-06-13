@@ -179,9 +179,7 @@ class OpenCodeAgent:
         if not url:
             raise RuntimeError("No server URL configured")
         try:
-            self._http_request(
-                "GET", "/global/health", timeout=5, max_retries=1
-            )
+            self._http_request("GET", "/global/health", timeout=5, max_retries=1)
         except (
             RuntimeError,
             ConnectionError,
@@ -294,17 +292,13 @@ class OpenCodeAgent:
 
     def _abort_session(self, session_id: str) -> None:
         try:
-            self._request(
-                f"/session/{session_id}/abort", method="POST", timeout=3
-            )
+            self._request(f"/session/{session_id}/abort", method="POST", timeout=3)
         except Exception:
             pass
 
     def _delete_session(self, session_id: str) -> None:
         try:
-            self._request(
-                f"/session/{session_id}", method="DELETE", timeout=3
-            )
+            self._request(f"/session/{session_id}", method="DELETE", timeout=3)
         except Exception:
             pass
 
@@ -332,9 +326,7 @@ class OpenCodeAgent:
                     self._process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     try:
-                        os.killpg(
-                            os.getpgid(self._process.pid), signal.SIGKILL
-                        )
+                        os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
                     except OSError:
                         self._process.kill()
                     self._process.wait(timeout=2)

@@ -1,3 +1,4 @@
+import random
 import time
 
 from pydantic import BaseModel, Field
@@ -12,6 +13,9 @@ from kaizen.git import (
 )
 from kaizen.run import RunInfo, append_notes
 from kaizen.work_prompt import build_iteration_prompt
+
+_BACKOFF_BASE_DELAY = 5.0
+_BACKOFF_MAX_DELAY = 120.0
 
 WORK_SCHEMA = {
     "type": "object",
@@ -86,8 +90,10 @@ class Orchestrator:
                     print(f"\n  --- work iteration {self.iteration} ---")
 
                     iter_prompt = build_iteration_prompt(
-                        self.iteration, self.run_info.run_id,
-                        self.prompt, self.stop_when,
+                        self.iteration,
+                        self.run_info.run_id,
+                        self.prompt,
+                        self.stop_when,
                     )
 
                     try:
@@ -97,10 +103,26 @@ class Orchestrator:
                         self.fail_count += 1
                         self.consecutive_failures += 1
                         reset_hard(self.cwd)
-                        if self.consecutive_failures >= self.config.get("max_consecutive_failures", 3):
-                            print(f"  {self.consecutive_failures} consecutive failures, aborting")
+                        if self.consecutive_failures >= self.config.get(
+                            "max_consecutive_failures", 3
+                        ):
+                            print(
+                                f"  {self.consecutive_failures} consecutive failures, aborting"
+                            )
                             status = "aborted"
                             break
+                        delay = min(
+                            _BACKOFF_BASE_DELAY
+                            * (2 ** (self.consecutive_failures - 1)),
+                            _BACKOFF_MAX_DELAY,
+                        )
+                        delay *= 0.5 + random.random() * 0.5
+                        print(
+                            f"  backing off {delay:.0f}s (failure {self.consecutive_failures})..."
+                        )
+                        deadline = time.time() + delay
+                        while time.time() < deadline and not self._stop_requested:
+                            time.sleep(min(0.5, max(0, deadline - time.time())))
                         continue
 
                     work = WorkOutput.model_validate(result.output)
@@ -118,12 +140,17 @@ class Orchestrator:
                             self.consecutive_failures += 1
                             continue
 
-                        self.commit_count = branch_commit_count(self.run_info.base_commit, self.cwd)
+                        self.commit_count = branch_commit_count(
+                            self.run_info.base_commit, self.cwd
+                        )
                         self.success_count += 1
                         self.consecutive_failures = 0
                         append_notes(
                             self.run_info.run_dir + "/notes.md",
-                            self.iteration, work.summary, work.key_changes_made, work.key_learnings,
+                            self.iteration,
+                            work.summary,
+                            work.key_changes_made,
+                            work.key_learnings,
                         )
                         print(f"  committed: {work.summary}")
 
@@ -139,7 +166,10 @@ class Orchestrator:
                         reset_hard(self.cwd)
                         append_notes(
                             self.run_info.run_dir + "/notes.md",
-                            self.iteration, f"[FAIL] {work.summary}", [], work.key_learnings,
+                            self.iteration,
+                            f"[FAIL] {work.summary}",
+                            [],
+                            work.key_learnings,
                         )
                         print(f"  failed: {work.summary}")
 
@@ -148,8 +178,12 @@ class Orchestrator:
                         status = "stopped"
                         break
 
-                    if self.consecutive_failures >= self.config.get("max_consecutive_failures", 3):
-                        print(f"  {self.consecutive_failures} consecutive failures, aborting")
+                    if self.consecutive_failures >= self.config.get(
+                        "max_consecutive_failures", 3
+                    ):
+                        print(
+                            f"  {self.consecutive_failures} consecutive failures, aborting"
+                        )
                         status = "aborted"
                         break
 

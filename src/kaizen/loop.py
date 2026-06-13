@@ -9,22 +9,36 @@ from kaizen.agent import OpenCodeAgent
 from kaizen.config import load_config
 from kaizen.findings import FindingsResult, Finding
 from kaizen.git import (
+    branch_commit_count,
+    branch_exists,
     checkout,
     commit_all,
     copy_user_identity,
     create_branch,
+    create_worktree_checkout,
     create_worktree_from_ref,
     delete_branch,
     fetch,
     get_default_branch,
+    git_root,
+    hash_prompt,
     head_commit,
+    is_git_repo,
+    prompt_branch,
     remove_worktree,
     resolve_ref,
-    slugify_prompt,
 )
 from kaizen.orchestrator import Orchestrator
 from kaizen.review_prompt import FIX_SCHEMA, build_fix_prompt
-from kaizen.run import RunInfo, setup_run, update_run_head, update_run_pr_url, update_run_status
+from kaizen.run import (
+    RunInfo,
+    load_run,
+    runs_home,
+    setup_run,
+    update_run_head,
+    update_run_pr_url,
+    update_run_status,
+)
 from kaizen.steps.pr import PRStep
 from kaizen.steps.push import PushStep
 from kaizen.steps.review import ReviewStep
@@ -38,6 +52,7 @@ class _WorkContext:
     base_commit: str
     run_info: RunInfo
     default_branch: str
+    start_iteration: int = 0
 
 
 def _setup_work_context(
@@ -59,6 +74,30 @@ def _setup_work_context(
     else:
         Path(root_gitignore).write_text(".kaizen/\n")
 
+    repo_path = os.path.realpath(git_root(cwd))
+    hash_id = hash_prompt(repo_path, prompt)
+    branch = prompt_branch(repo_path, prompt)
+    worktree_path = os.path.join(cwd, ".kaizen", "worktrees", hash_id)
+    run_dir = os.path.join(runs_home(), hash_id)
+
+    if use_worktree and os.path.isdir(worktree_path) and is_git_repo(worktree_path):
+        run_info = load_run(run_dir)
+        if run_info is not None and branch_exists(cwd, branch):
+            start_iteration = branch_commit_count(run_info.base_commit, worktree_path)
+            fetch(cwd)
+            default_branch = get_default_branch(cwd)
+            print(f"  resuming run {hash_id} at iteration {start_iteration}")
+            return _WorkContext(
+                branch=branch,
+                work_dir=worktree_path,
+                worktree_path=worktree_path,
+                base_commit=run_info.base_commit,
+                run_info=run_info,
+                default_branch=default_branch,
+                start_iteration=start_iteration,
+            )
+        remove_worktree(cwd, worktree_path)
+
     fetch(cwd)
     default_branch = get_default_branch(cwd)
     try:
@@ -66,20 +105,28 @@ def _setup_work_context(
     except RuntimeError:
         base_commit = head_commit(cwd)
 
-    branch = slugify_prompt(prompt)
     work_dir = cwd
-    worktree_path: str | None = None
+    wt_path: str | None = None
 
     if use_worktree:
-        worktree_path = os.path.join(cwd, ".kaizen", "worktrees", branch.replace("/", "-"))
-        print(f"  creating worktree: {worktree_path}")
-        try:
-            create_worktree_from_ref(cwd, worktree_path, branch, f"origin/{default_branch}")
-        except RuntimeError as e:
-            print(f"  worktree creation failed: {e}", file=sys.stderr)
-            sys.exit(1)
-        copy_user_identity(cwd, worktree_path)
-        work_dir = worktree_path
+        wt_path = worktree_path
+        print(f"  creating worktree: {wt_path}")
+        if branch_exists(cwd, branch):
+            try:
+                create_worktree_checkout(cwd, wt_path, branch)
+            except RuntimeError as e:
+                print(f"  worktree creation failed: {e}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            try:
+                create_worktree_from_ref(
+                    cwd, wt_path, branch, f"origin/{default_branch}"
+                )
+            except RuntimeError as e:
+                print(f"  worktree creation failed: {e}", file=sys.stderr)
+                sys.exit(1)
+        copy_user_identity(cwd, wt_path)
+        work_dir = wt_path
     else:
         try:
             create_branch(branch, cwd)
@@ -92,14 +139,15 @@ def _setup_work_context(
         branch=branch,
         base_commit=base_commit,
         head_commit=current_head,
-        worktree_path=worktree_path,
+        run_id=hash_id,
+        worktree_path=wt_path,
         repo_cwd=cwd,
     )
 
     return _WorkContext(
         branch=branch,
         work_dir=work_dir,
-        worktree_path=worktree_path,
+        worktree_path=wt_path,
         base_commit=base_commit,
         run_info=run_info,
         default_branch=default_branch,
@@ -119,8 +167,9 @@ def run_loop(
     print(f"  run {ctx.run_info.run_id} on branch {ctx.branch}")
     print(f"  base: {ctx.default_branch} ({ctx.base_commit[:8]})")
 
+    result = "failed"
+
     try:
-        # ── Phase 1: WORK ──
         print(f"\n{'=' * 50}")
         print("  PHASE: WORK")
         print(f"{'=' * 50}")
@@ -132,6 +181,7 @@ def run_loop(
             prompt=prompt,
             cwd=ctx.work_dir,
             max_iterations=max_work_iterations or config.get("max_work_iterations"),
+            start_iteration=ctx.start_iteration,
             repo_dir=cwd,
         )
         orch.run()
@@ -139,7 +189,6 @@ def run_loop(
         current_head = head_commit(ctx.work_dir)
         update_run_head(ctx.run_info.run_dir, current_head)
 
-        # ── Phase 2: REVIEW (with fix loop) ──
         print(f"\n{'=' * 50}")
         print("  PHASE: REVIEW")
         print(f"{'=' * 50}")
@@ -176,10 +225,15 @@ def run_loop(
 
             if auto_fix_items:
                 print(f"\n  auto-fixing {len(auto_fix_items)} issues...")
-                fix_prompt = build_fix_prompt([_finding_to_dict(f) for f in auto_fix_items])
+                fix_prompt = build_fix_prompt(
+                    [_finding_to_dict(f) for f in auto_fix_items]
+                )
                 try:
                     agent.run(fix_prompt, ctx.work_dir, schema=FIX_SCHEMA, repo_dir=cwd)
-                    commit_all(f"kaizen: fix {len(auto_fix_items)} review findings", ctx.work_dir)
+                    commit_all(
+                        f"kaizen: fix {len(auto_fix_items)} review findings",
+                        ctx.work_dir,
+                    )
                     current_head = head_commit(ctx.work_dir)
                     update_run_head(ctx.run_info.run_dir, current_head)
                     print("  fixes committed")
@@ -190,7 +244,6 @@ def run_loop(
                 print("  no actionable findings")
             break
 
-        # ── Phase 3: SHIP ──
         print(f"\n{'=' * 50}")
         print("  PHASE: SHIP")
         print(f"{'=' * 50}")
@@ -214,6 +267,7 @@ def run_loop(
             update_run_pr_url(ctx.run_info.run_dir, pr_outcome.pr_url)
 
         update_run_status(ctx.run_info.run_dir, "completed")
+        result = "passed"
         return "passed"
 
     except Exception as e:
@@ -222,16 +276,37 @@ def run_loop(
         return "failed"
 
     finally:
-        # ── Phase 4: CLEANUP ──
         print("\n  cleaning up...")
-        if ctx.worktree_path:
-            remove_worktree(cwd, ctx.worktree_path)
+        if result == "passed":
+            if ctx.worktree_path:
+                remove_worktree(cwd, ctx.worktree_path)
+            else:
+                try:
+                    checkout(ctx.default_branch, cwd)
+                except RuntimeError:
+                    pass
+            delete_branch(ctx.branch, cwd)
         else:
+            preserve = False
             try:
-                checkout(ctx.default_branch, cwd)
-            except RuntimeError:
+                if branch_commit_count(ctx.base_commit, ctx.work_dir) > 0:
+                    preserve = True
+            except Exception:
                 pass
-        delete_branch(ctx.branch, cwd)
+            if preserve:
+                print("  preserving worktree for resume")
+                notes_path = os.path.join(ctx.run_info.run_dir, "notes.md")
+                with open(notes_path, "a") as f:
+                    f.write("\nRun interrupted - worktree preserved for resume\n")
+            else:
+                if ctx.worktree_path:
+                    remove_worktree(cwd, ctx.worktree_path)
+                else:
+                    try:
+                        checkout(ctx.default_branch, cwd)
+                    except RuntimeError:
+                        pass
+                delete_branch(ctx.branch, cwd)
 
 
 def _finding_to_dict(f: Finding) -> dict:
