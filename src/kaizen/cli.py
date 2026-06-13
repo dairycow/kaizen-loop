@@ -26,20 +26,12 @@ def cmd_loop(args: argparse.Namespace) -> None:
     use_worktree = not args.no_worktree
     server_url = args.server_url or config.get("server_url")
 
-    agent = OpenCodeAgent(bin_path=opencode_bin, server_url=server_url)
+    agent = OpenCodeAgent(
+        project_dir=cwd,
+        server_url=server_url,
+        bin_path=opencode_bin,
+    )
 
-    force_exit = False
-
-    def handle_sigint(sig, frame):
-        nonlocal force_exit
-        if force_exit:
-            print("\n  force stop")
-            agent.close()
-            sys.exit(130)
-        force_exit = True
-        print("\n  stopping... (Ctrl+C again to force)")
-
-    signal.signal(signal.SIGINT, handle_sigint)
     signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0))
 
     try:
