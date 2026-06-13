@@ -144,6 +144,8 @@ kaizen "fix issue #1"
 kaizen "fix issue #2"
 ```
 
+Each kaizen run creates its own worktree and uses per-iteration sessions, so multiple runs can share a server safely. However, each session makes concurrent LLM API calls — running more than 3–4 kaizen processes in parallel may trigger API rate limits. kaizen retries transient HTTP 500 errors automatically (up to 4 retries with exponential backoff), but sustained rate limiting requires reducing the number of parallel runs.
+
 ### Checking server status
 
 ```bash

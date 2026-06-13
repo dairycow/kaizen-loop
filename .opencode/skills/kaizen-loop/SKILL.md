@@ -160,11 +160,12 @@ python3 -c "import json; print(json.load(open('.kaizen/runs/<run-id>/run.json'))
 
 ### Work phase
 
-- Uses iterative opencode sessions with structured output
+- Each iteration creates a **fresh opencode session** (per-iteration, not reused) — this prevents cascading failures when one iteration errors out
 - Each iteration: reads prior notes.md → does one incremental piece of work → reports success/failure
 - On success: auto-commits with message `kaizen <N>: <summary>`, appends to notes.md
 - On failure: resets hard, logs learnings, increments consecutive failure count
 - Aborts after `max_consecutive_failures` (default: 3) consecutive failures
+- HTTP 500 errors from the server are retried automatically (up to 4 retries with exponential backoff)
 
 ### Resume
 
@@ -191,6 +192,8 @@ Branches are named `kaizen/<hash>` where hash is the first 12 characters of `sha
 ## Troubleshooting
 
 **Server won't start**: Check if another opencode instance is running (`pgrep -a opencode`). Kill stale processes.
+
+**HTTP 500 or Connection refused during batch runs**: Too many concurrent kaizen sessions are overwhelming the LLM API rate limit. Reduce the number of parallel kaizen processes to 3–4. kaizen retries transient 500s automatically, but sustained rate limiting requires fewer concurrent runs.
 
 **Worktree creation failed**: Ensure no stale worktrees exist. Run `git worktree prune` in the repo.
 
@@ -234,7 +237,9 @@ nohup kaizen "implement feature B" > /tmp/kaizen-b.log 2>&1 &
 nohup kaizen "add tests for both features" > /tmp/kaizen-tests.log 2>&1 &
 ```
 
-Note: batch runs with a shared server can run in parallel since each uses its own worktree.
+Batch runs with a shared server can run in parallel since each uses its own worktree and per-iteration sessions.
+
+**Concurrency guidance**: Each kaizen session makes concurrent LLM API calls. Running too many sessions simultaneously (typically >3–4) can trigger API rate limits, causing server errors and connection failures. If you see repeated `HTTP 500` or `Connection refused` errors in the logs, reduce the number of parallel kaizen processes. kaizen retries transient 500s automatically (up to 4 retries), but sustained rate limiting requires fewer concurrent runs.
 
 ### Work in current tree (no worktree isolation)
 
