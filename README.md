@@ -174,12 +174,15 @@ kill %1    # if launched with & in the current shell
   "max_review_rounds": 3,
   "max_consecutive_failures": 3,
   "use_worktree": true,
+  "sync_main": true,
   "work_model": null,
   "review_model": null
 }
 ```
 
 Set `work_model` / `review_model` to a `"providerID/modelID"` string (e.g. `"zai-coding-plan/glm-5-turbo"`) to pin a model per phase. When `null`, the opencode server's default model is used. CLI flags `--work-model` / `--review-model` override config; `--model` sets both.
+
+`sync_main` (default `true`) controls whether kaizen re-syncs with `origin/<default-branch>` at phase boundaries. When enabled, kaizen fetches and rebases the work branch onto current `main` before the **REVIEW** and **SHIP** phases, so the review diff and the final PR reflect the latest main. If the rebase conflicts, kaizen aborts it and proceeds with the original base (the PR may show conflicts on GitHub). Set to `false` to keep the single fetch-at-setup behavior.
 
 ## Project structure
 

@@ -25,6 +25,8 @@ from kaizen.git import (
     head_commit,
     is_git_repo,
     prompt_branch,
+    rebase_abort,
+    rebase_onto,
     remove_worktree,
     resolve_ref,
 )
@@ -34,6 +36,7 @@ from kaizen.run import (
     RunInfo,
     load_run,
     setup_run,
+    update_run_base,
     update_run_head,
     update_run_pr_url,
     update_run_status,
@@ -152,6 +155,45 @@ def _setup_work_context(
     )
 
 
+def _sync_base(ctx: _WorkContext, cwd: str) -> None:
+    try:
+        fetch(cwd)
+    except RuntimeError as e:
+        print(f"  sync: fetch failed ({e}), keeping base {ctx.base_commit[:8]}")
+        return
+
+    try:
+        new_base = resolve_ref(cwd, f"origin/{ctx.default_branch}")
+    except RuntimeError as e:
+        print(f"  sync: could not resolve origin/{ctx.default_branch} ({e})")
+        return
+
+    if new_base == ctx.base_commit:
+        return
+
+    print(
+        f"  sync: {ctx.default_branch} advanced "
+        f"({ctx.base_commit[:8]} -> {new_base[:8]}), rebasing..."
+    )
+    try:
+        rebase_onto(ctx.work_dir, new_base, ctx.base_commit)
+    except RuntimeError as e:
+        print(
+            f"  sync: rebase conflicted ({e}); aborting and keeping "
+            f"base {ctx.base_commit[:8]}",
+            file=sys.stderr,
+        )
+        rebase_abort(ctx.work_dir)
+        return
+
+    ctx.base_commit = new_base
+    ctx.run_info.base_commit = new_base
+    update_run_base(ctx.run_info.run_dir, new_base)
+    current_head = head_commit(ctx.work_dir)
+    update_run_head(ctx.run_info.run_dir, current_head)
+    print("  sync: rebased onto current base")
+
+
 def run_loop(
     prompt: str,
     cwd: str,
@@ -190,6 +232,9 @@ def run_loop(
 
         current_head = head_commit(ctx.work_dir)
         update_run_head(ctx.run_info.run_dir, current_head)
+
+        if config.get("sync_main", True):
+            _sync_base(ctx, cwd)
 
         print(f"\n{'=' * 50}")
         print("  PHASE: REVIEW")
@@ -251,6 +296,9 @@ def run_loop(
             else:
                 print("  no actionable findings")
             break
+
+        if config.get("sync_main", True):
+            _sync_base(ctx, cwd)
 
         print(f"\n{'=' * 50}")
         print("  PHASE: SHIP")

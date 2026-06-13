@@ -85,6 +85,13 @@ def update_run_pr_url(run_dir: str, pr_url: str) -> None:
         _save(info)
 
 
+def update_run_base(run_dir: str, base_commit: str) -> None:
+    info = load_run(run_dir)
+    if info:
+        info.base_commit = base_commit
+        _save(info)
+
+
 def _save(info: RunInfo) -> None:
     path = os.path.join(info.run_dir, "run.json")
     d = asdict(info)

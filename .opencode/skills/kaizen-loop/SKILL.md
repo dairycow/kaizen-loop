@@ -9,8 +9,8 @@ kaizen is a CLI tool (`kaizen-loop` package) that drives opencode through an aut
 
 1. **SETUP** — fetches `origin/<default-branch>`, creates branch `kaizen/<hash>`, creates isolated git worktree
 2. **WORK** — runs opencode sessions iteratively with notes.md memory across iterations
-3. **REVIEW** — agent reviews the diff, returns structured findings (severity + action), auto-fixes mechanical issues
-4. **SHIP** — force-pushes to origin, creates PR via `gh`
+3. **REVIEW** — fetches+rebases onto current `main` (if advanced), then agent reviews the diff, returns structured findings (severity + action), auto-fixes mechanical issues
+4. **SHIP** — fetches+rebases onto current `main` (if advanced), force-pushes to origin, creates PR via `gh`
 5. **CLEANUP** — removes worktree and deletes branch on success; preserves worktree on failure (for resume)
 
 ## When to use this skill
@@ -136,12 +136,15 @@ curl -X POST http://127.0.0.1:4096/instance/dispose
   "max_review_rounds": 3,
   "max_consecutive_failures": 3,
   "use_worktree": true,
+  "sync_main": true,
   "work_model": null,
   "review_model": null
 }
 ```
 
 Set `work_model` / `review_model` to a `"providerID/modelID"` string (e.g. `"zai-coding-plan/glm-5-turbo"`) to pin a model per phase. When `null`, the server default is used. CLI flags take precedence over config.
+
+`sync_main` (default `true`) — when enabled, kaizen fetches and rebases the work branch onto current `main` before the REVIEW and SHIP phases. On conflict, the rebase is aborted and the original base is kept. Set `false` for the single fetch-at-setup behavior.
 
 ## Run history
 
@@ -181,6 +184,7 @@ If a run is interrupted (failure, cancellation, crash), kaizen can resume it. On
 
 ### Review phase
 
+- Before review: kaizen fetches `origin/<default-branch>` and rebases the work branch onto it if `main` has advanced (controlled by `sync_main` config, default `true`). On conflict, the rebase is aborted and the original base is kept.
 - Agent reviews the full diff against base commit
 - Returns structured findings with severity (`info`/`warning`/`error`) and action (`no-op`/`auto-fix`)
 - `no-op`: informational, silently accepted
@@ -189,6 +193,7 @@ If a run is interrupted (failure, cancellation, crash), kaizen can resume it. On
 
 ### Ship phase
 
+- Before ship: kaizen fetches+rebases onto current `main` again (if advanced since review)
 - Force-pushes branch to origin (with lease for safety)
 - Creates PR via `gh pr create` with title and body including risk assessment
 - Updates existing PR if one already exists for the branch
@@ -206,6 +211,8 @@ Branches are named `kaizen/<hash>` where hash is the first 12 characters of `sha
 **Worktree creation failed**: Ensure no stale worktrees exist. Run `git worktree prune` in the repo.
 
 **Push failed**: Check git remote access. Ensure `origin` is configured and you have push permissions.
+
+**"sync: rebase conflicted" in logs**: During the REVIEW or SHIP phase, kaizen tried to rebase onto current `main` but hit a conflict. It aborted the rebase and kept the original base, so the run continues — but the PR may show merge conflicts on GitHub. Resolve them manually in the PR, or set `"sync_main": false` in `~/.kaizen/config.json` to disable phase-boundary syncing entirely.
 
 **PR creation failed**: Ensure `gh` CLI is installed and authenticated (`gh auth status`).
 

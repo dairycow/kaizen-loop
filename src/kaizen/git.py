@@ -169,6 +169,17 @@ def force_push_with_lease(cwd: str, remote: str, branch: str) -> None:
     _git(["push", "--force-with-lease", remote, f"HEAD:refs/heads/{branch}"], cwd)
 
 
+def rebase_onto(cwd: str, new_base: str, old_base: str) -> None:
+    _git(["rebase", "--onto", new_base, old_base], cwd)
+
+
+def rebase_abort(cwd: str) -> None:
+    try:
+        _git(["rebase", "--abort"], cwd)
+    except RuntimeError:
+        pass
+
+
 def copy_user_identity(src_cwd: str, dst_cwd: str) -> None:
     for key in ["user.name", "user.email"]:
         try:
